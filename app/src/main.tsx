@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './styles.css';
+import { applyAccent, loadAccent } from './web/theme';
+
+applyAccent(loadAccent());
 
 // Service worker: pre-caches the app shell so it opens offline and updates
 // itself in the background on the next launch.

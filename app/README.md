@@ -108,6 +108,16 @@ then served at `https://<owner>.github.io/<repo>/`.
 Install on a phone: open the URL in Safari (iPhone) or Chrome (Android) and
 choose **Add to Home Screen**.
 
+## Setting up a new person
+
+Each person has their own app account (email + password) and their own Apple
+ID; nothing is shared between accounts. The in-app **Settings → Setup guide**
+walks through it. In short: add the app to the home screen, create an account,
+tap "Set up Reminders sync", download the Shortcut file on any Mac while
+signed in as that person, sign it with `shortcuts sign`, AirDrop the signed
+file to that person's iPhone, run it once, then Refresh. The accent colour is
+per device under Settings → Appearance.
+
 ## Code layout
 
 ```
