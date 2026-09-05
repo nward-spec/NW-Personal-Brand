@@ -49,9 +49,11 @@ Deno.serve(async (req: Request) => {
       const { error: saveErr } = await admin.from('reminders').upsert(payload, { onConflict: 'user_id,uid' });
       if (saveErr) throw new Error(saveErr.message);
     }
+    const current = (link.dinners_list as string) ?? 'Dinners';
+    const dinners = result.lists.includes(current) ? current : (result.lists.find((l) => /dinner|meal|food/i.test(l)) ?? current);
     await admin
       .from('shortcut_links')
-      .update({ lists: result.lists, last_sync_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() })
+      .update({ lists: result.lists, dinners_list: dinners, last_sync_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() })
       .eq('user_id', userId);
 
     console.log(`shortcut sync user=${userId} snapshot=${snapshot.length} pulled=${result.pulled} commands=${result.commands.length} tombstoned=${result.tombstoned}`);

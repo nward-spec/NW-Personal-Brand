@@ -10,8 +10,10 @@
 //   delete | <line number> | <title> |        Get Item from List → Remove Reminders
 //   create | <list> | <title> | <due>          Add New Reminder
 //
-// Ticking a reminder in the app removes it from the phone (the app keeps it as
-// done); renames, date changes and un-ticking become delete + create.
+// The snapshot holds open reminders only. Ticking a reminder in the app removes
+// it from the phone (the app keeps it as done); one that disappears from the
+// phone is shown as done here; renames, date changes and un-ticking become
+// delete + create.
 
 import type { ReminderRow } from '../reminders-sync/sync.ts';
 
@@ -156,7 +158,9 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
     // No pending edit: the phone is the truth, once its snapshot has caught up.
     if (!item) {
       if (row.completed || recentlyDispatched(row)) continue; // done items live on in the app
-      save.push({ ...row, deleted: true, pending: null, updatedAt: nowIso });
+      // The snapshot only carries open reminders, so one that is gone was ticked
+      // (or deleted) on the phone: show it as done here.
+      save.push({ ...row, completed: true, completedAt: nowIso, pending: null, dispatchedAt: null, updatedAt: nowIso });
       continue;
     }
     consumed.add(oldKey);
