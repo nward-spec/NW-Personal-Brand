@@ -85,5 +85,8 @@ create policy "icloud: own row update" on public.icloud_accounts
 drop policy if exists "icloud: own row delete" on public.icloud_accounts;
 create policy "icloud: own row delete" on public.icloud_accounts
   for delete to authenticated using (user_id = auth.uid());
+-- Supabase grants `authenticated` full table access by default; replace that
+-- with column-level grants that exclude the encrypted secret.
 revoke all on public.icloud_accounts from anon;
+revoke all on public.icloud_accounts from authenticated;
 grant select (user_id, apple_id, principal_url, home_url, dinners_list, last_sync_at, last_error, lists, updated_at), update (dinners_list), delete on public.icloud_accounts to authenticated;
