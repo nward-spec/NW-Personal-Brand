@@ -1,7 +1,7 @@
 // Builds the "Journal Sync" iPhone Shortcut as an unsigned .shortcut plist.
 //
 // What the Shortcut does:
-//   1. Find Reminders (newest 400 by creation date).
+//   1. Find Reminders that are not completed (newest 400 by creation date).
 //   2. For each, write one line "title | list | due | completed".
 //   3. POST the lines to the reminders-shortcut function with the sync token.
 //   4. For each command line in the reply:
@@ -123,6 +123,16 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
     // 1. Snapshot
     action('filter.reminders', {
       UUID: REM,
+      // Open reminders only: a recurring list spawns a completed copy per tick,
+      // which would otherwise crowd out everything else.
+      WFContentItemFilter: {
+        Value: {
+          WFActionParameterFilterPrefix: 1,
+          WFActionParameterFilterTemplates: [{ Operator: 4, Property: 'Is Completed', Removable: true, Values: { Bool: false } }],
+          WFContentPredicateBoundedDate: false,
+        },
+        WFSerializationType: 'WFContentPredicateTableTemplate',
+      },
       WFContentItemSortProperty: 'Creation Date',
       WFContentItemSortOrder: 'Latest First',
       WFContentItemLimitEnabled: true,

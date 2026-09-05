@@ -82,16 +82,16 @@ describe('reconcile', () => {
     expect(r.save[0]).toMatchObject({ due: '2026-03-22', pending: null });
   });
 
-  it('tombstones open rows that vanished from the phone, and mirrors phone changes', () => {
+  it('marks open rows that vanished from the phone as done, and mirrors phone changes', () => {
     const rows = [row('Reminders', 'Gone'), row('Reminders', 'Done', { completed: true }), row('Reminders', 'Ticked'), row('Dinners', 'Tacos', { due: '2026-03-17' })];
     const snap = parseSnapshot('Ticked | Reminders |  | Yes\nTacos | Dinners | 2026-03-18 | No');
     const r = reconcile({ rows, snapshot: snap, now: NOW, newId });
     const saved = Object.fromEntries(r.save.map((s) => [s.uid, s]));
-    expect(saved['Reminders-Gone']).toMatchObject({ deleted: true });
+    expect(saved['Reminders-Gone']).toMatchObject({ completed: true, completedAt: NOW.toISOString(), deleted: false });
     expect(saved['Reminders-Done']).toBeUndefined();
     expect(saved['Reminders-Ticked']).toMatchObject({ completed: true, completedAt: NOW.toISOString() });
     expect(saved['Dinners-Tacos']).toMatchObject({ due: '2026-03-18' });
-    expect(r.tombstoned).toBe(1);
+    expect(r.tombstoned).toBe(0);
   });
 
   it('recreates an edited reminder the phone has lost', () => {
