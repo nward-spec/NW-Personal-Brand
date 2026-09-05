@@ -10,6 +10,8 @@ import { cloudConfigured, supabase } from './supabase';
 
 export interface CloudState {
   configured: boolean;
+  /** True when the app was opened from a password-reset link: show the new-password form. */
+  recovery: boolean;
   /** False until the initial session check finishes. */
   ready: boolean;
   user: { id: string; email: string | null } | null;
@@ -18,7 +20,7 @@ export interface CloudState {
   pending: number;
 }
 
-let state: CloudState = { configured: cloudConfigured, ready: !cloudConfigured, user: null, status: 'idle', pending: 0 };
+let state: CloudState = { configured: cloudConfigured, recovery: false, ready: !cloudConfigured, user: null, status: 'idle', pending: 0 };
 const listeners = new Set<() => void>();
 let engine: SyncEngine | null = null;
 
@@ -51,6 +53,7 @@ if (supabase) {
     set({ ready: true });
   });
   supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') set({ recovery: true });
     if (event === 'SIGNED_OUT' || !session) {
       stopEngine();
       set({ user: null, status: 'idle', pending: 0, detail: undefined });
@@ -103,6 +106,16 @@ export const cloud = {
   async magicLink(email: string) {
     const { error } = await requireClient().auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
     if (error) throw new Error(error.message);
+  },
+  /** Email a password-reset link. It opens in Safari; the new password then works in the installed app. */
+  async resetPassword(email: string) {
+    const { error } = await requireClient().auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] });
+    if (error) throw new Error(error.message);
+  },
+  async setPassword(password: string) {
+    const { error } = await requireClient().auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+    set({ recovery: false });
   },
   async signOut() {
     const { error } = await requireClient().auth.signOut();
