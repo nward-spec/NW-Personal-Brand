@@ -90,3 +90,27 @@ create policy "icloud: own row delete" on public.icloud_accounts
 revoke all on public.icloud_accounts from anon;
 revoke all on public.icloud_accounts from authenticated;
 grant select (user_id, apple_id, principal_url, home_url, dinners_list, last_sync_at, last_error, lists, updated_at), update (dinners_list), delete on public.icloud_accounts to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Apple Reminders via an iPhone Shortcut (Apple removed CalDAV access to
+-- Reminders in iOS 13). The app creates one row with a random token; the
+-- Shortcut presents that token to the `reminders-shortcut` edge function.
+
+create table if not exists public.shortcut_links (
+  user_id      uuid        primary key default auth.uid() references auth.users (id) on delete cascade,
+  token        text        not null unique,
+  dinners_list text        not null default 'Dinners',
+  lists        jsonb       not null default '[]'::jsonb,
+  last_sync_at timestamptz,
+  last_error   text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+alter table public.shortcut_links enable row level security;
+drop policy if exists "shortcut_links: own row" on public.shortcut_links;
+create policy "shortcut_links: own row" on public.shortcut_links
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+revoke all on public.shortcut_links from anon;
