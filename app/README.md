@@ -75,9 +75,8 @@ an iPhone Shortcut that talks to the same tables.
    sign-in link" button, add your app's URL to Authentication → URL
    Configuration → Redirect URLs.
 4. Copy the project URL and anon key (Project Settings → API) into
-   `app/.env.local` (see `.env.example`) for local dev, and into the GitHub
-   Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the
-   deployed build.
+   `app/.env.production` (committed, used by the GitHub Pages build) and
+   `app/.env.local` for local dev (see `.env.example`).
 
 Sync model: each week is one JSON document, plus one for the template.
 Edits are saved locally first, queued, and pushed after a short delay; the
@@ -103,9 +102,7 @@ The workflow in `.github/workflows/deploy-app.yml` builds `app/` and publishes
 it on every push to `main` that touches `app/`.
 
 One-time setup: repo **Settings → Pages → Source: GitHub Actions**. The app is
-then served at `https://<owner>.github.io/<repo>/`. Add the two Supabase
-variables under **Settings → Secrets and variables → Actions → Variables** if
-you want sync.
+then served at `https://<owner>.github.io/<repo>/`.
 
 Install on a phone: open the URL in Safari (iPhone) or Chrome (Android) and
 choose **Add to Home Screen**.

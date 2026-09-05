@@ -2,9 +2,7 @@
 #
 # One-time setup in the repo settings:
 #   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
-# Optional (for cloud sync), under Settings -> Secrets and variables -> Actions -> Variables:
-#   VITE_SUPABASE_URL       e.g. https://abcd1234.supabase.co
-#   VITE_SUPABASE_ANON_KEY  the project's anon (public) key
+# Cloud sync settings live in app/.env.production (see app/README.md).
 name: Deploy Weekly Journal
 
 on:
@@ -47,8 +45,7 @@ jobs:
         env:
           # Served at https://<owner>.github.io/<repo>/
           BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # Supabase URL and anon key come from app/.env.production (committed).
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
