@@ -14,6 +14,8 @@ export const SHORTCUT_NAME = 'Journal Sync';
 export interface RemindersAccount {
   token: string;
   dinnersList: string;
+  /** Reminders list whose undated items join the weekly to-do list. */
+  todoList: string;
   lists: string[];
   lastSyncAt: string | null;
   lastError: string | null;
@@ -64,6 +66,7 @@ function randomToken(): string {
 const rowToAccount = (data: Record<string, unknown>): RemindersAccount => ({
   token: data.token as string,
   dinnersList: data.dinners_list as string,
+  todoList: (data.todo_list as string) ?? 'Reminders',
   lists: (data.lists as string[]) ?? [],
   lastSyncAt: (data.last_sync_at as string | null) ?? null,
   lastError: (data.last_error as string | null) ?? null,
@@ -72,7 +75,7 @@ const rowToAccount = (data: Record<string, unknown>): RemindersAccount => ({
 async function refreshAccount() {
   set({ loading: true });
   try {
-    const { data, error } = await client().from('shortcut_links').select('token, dinners_list, lists, last_sync_at, last_error').maybeSingle();
+    const { data, error } = await client().from('shortcut_links').select('token, dinners_list, todo_list, lists, last_sync_at, last_error').maybeSingle();
     if (error) throw new Error(error.message);
     set({ loading: false, account: data ? rowToAccount(data) : null, error: null });
   } catch (err) {
@@ -92,7 +95,7 @@ export const reminders = {
   /** Create the link row with a fresh token. */
   async connect(): Promise<RemindersAccount> {
     const token = randomToken();
-    const { data, error } = await client().from('shortcut_links').upsert({ token }, { onConflict: 'user_id' }).select('token, dinners_list, lists, last_sync_at, last_error').single();
+    const { data, error } = await client().from('shortcut_links').upsert({ token }, { onConflict: 'user_id' }).select('token, dinners_list, todo_list, lists, last_sync_at, last_error').single();
     if (error) throw new Error(error.message);
     const account = rowToAccount(data);
     set({ account, error: null });
@@ -109,6 +112,12 @@ export const reminders = {
     }
     set({ account: null, error: null });
     await cloud.syncNow();
+  },
+
+  async setTodoList(list: string) {
+    const { error } = await client().from('shortcut_links').update({ todo_list: list, updated_at: new Date().toISOString() }).neq('token', '');
+    if (error) throw new Error(error.message);
+    if (state.account) set({ account: { ...state.account, todoList: list } });
   },
 
   async setDinnersList(list: string) {

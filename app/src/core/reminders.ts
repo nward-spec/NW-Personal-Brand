@@ -22,11 +22,17 @@ export function remindersForDay(data: AppData, date: string, opts: { excludeList
     .sort(byTitle);
 }
 
-/** Undated reminders: open ones, plus any completed today so the tick is visible. */
-export function undatedReminders(data: AppData, opts: { excludeList?: string; today?: string } = {}): ReminderRow[] {
+/** List whose undated reminders join the weekly to-do list until the user picks one. */
+export const DEFAULT_TODO_LIST = 'Reminders';
+
+/**
+ * Undated reminders for the weekly to-do list: open ones, plus any completed
+ * today so the tick is visible. `onlyList` restricts to one Reminders list.
+ */
+export function undatedReminders(data: AppData, opts: { excludeList?: string; onlyList?: string; today?: string } = {}): ReminderRow[] {
   const today = opts.today ?? todayISO();
   return liveReminders(data)
-    .filter((r) => r.due === null && (!opts.excludeList || r.list !== opts.excludeList))
+    .filter((r) => r.due === null && (!opts.excludeList || r.list !== opts.excludeList) && (!opts.onlyList || r.list.toLowerCase() === opts.onlyList.toLowerCase()))
     .filter((r) => !r.completed || (r.completedAt ?? '').slice(0, 10) === today)
     .sort(byTitle);
 }

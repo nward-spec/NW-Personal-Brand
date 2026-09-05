@@ -100,12 +100,14 @@ create table if not exists public.shortcut_links (
   user_id      uuid        primary key default auth.uid() references auth.users (id) on delete cascade,
   token        text        not null unique,
   dinners_list text        not null default 'Dinners',
+  todo_list    text        not null default 'Reminders',
   lists        jsonb       not null default '[]'::jsonb,
   last_sync_at timestamptz,
   last_error   text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+alter table public.shortcut_links add column if not exists todo_list text not null default 'Reminders';
 
 alter table public.shortcut_links enable row level security;
 drop policy if exists "shortcut_links: own row" on public.shortcut_links;

@@ -191,7 +191,7 @@ function RemindersCard() {
       {c.configured && c.user && !r.account && (
         <>
           <p className="note">
-            Reminders sync through a small Shortcut on your iPhone. Reminders with a due date appear on that day, undated ones on the to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders when the Shortcut next runs.
+            Reminders sync through a small Shortcut on your iPhone. Reminders with a due date appear on that day, undated ones from your Reminders list join the weekly to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders when the Shortcut next runs.
           </p>
           {error && <p className="error">{error}</p>}
           <button type="button" className="btn primary" disabled={busy} onClick={() => run(async () => (await reminders.connect(), setShowSteps(true), 'Ready. Follow the steps below to install the Shortcut.'))}>
@@ -204,6 +204,21 @@ function RemindersCard() {
           <div className="kv">
             <span className="k">Lists seen</span>
             <span>{r.account.lists.length ? r.account.lists.join(', ') : 'none yet — run the Shortcut'}</span>
+          </div>
+          <div className="kv">
+            <span className="k">To-do list from</span>
+            <select
+              value={r.account.todoList}
+              onChange={(e) => run(() => reminders.setTodoList(e.target.value))}
+              aria-label="Reminders list for the weekly to-do list"
+              style={{ font: 'inherit', padding: '6px 8px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'inherit' }}
+            >
+              {[r.account.todoList, ...r.account.lists.filter((l) => l !== r.account?.todoList)].map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="kv">
             <span className="k">Dinners list</span>

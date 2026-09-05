@@ -21,7 +21,7 @@ import {
 import type { Goal, Habit } from '../core/types';
 import type { DayKey } from '../core/week';
 import { store, updateWeek, useAppData, useWeek } from '../web/app-store';
-import { DEFAULT_DINNERS_LIST, deleteReminder, renameReminder, setReminderDue, toggleReminder, undatedReminders } from '../core/reminders';
+import { DEFAULT_TODO_LIST, deleteReminder, renameReminder, setReminderDue, toggleReminder, undatedReminders } from '../core/reminders';
 import { useReminders } from '../web/reminders';
 import { weekDates } from '../core/week';
 import { DayPick, daysLabel } from './Chips';
@@ -35,7 +35,7 @@ export function WeekScreen({ weekStart }: { weekStart: string }) {
   const week = useWeek(weekStart);
   const data = useAppData();
   const { account } = useReminders();
-  const undated = undatedReminders(data, { excludeList: account?.dinnersList ?? DEFAULT_DINNERS_LIST });
+  const undated = undatedReminders(data, { onlyList: account?.todoList ?? DEFAULT_TODO_LIST });
   const [sheet, setSheet] = useState<SheetState>(null);
   const [rsheet, setRsheet] = useState<string | null>(null);
   const rem = rsheet ? data.reminders[rsheet] : undefined;
