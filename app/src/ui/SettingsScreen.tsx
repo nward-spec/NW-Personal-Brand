@@ -74,6 +74,25 @@ function AccountCard() {
         </p>
       )}
       {c.configured && !c.ready && <p className="note">Checking sign-in…</p>}
+      {c.configured && c.user && c.recovery && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => (await cloud.setPassword(password), setPassword(''), 'Password saved. Use it to sign in on your phone.'));
+          }}
+        >
+          <p className="note">Choose a new password for {c.user.email ?? 'your account'}.</p>
+          <div className="field">
+            <label htmlFor="new-password">New password</label>
+            <input id="new-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          {error && <p className="error">{error}</p>}
+          {message && <p className="ok">{message}</p>}
+          <button type="submit" className="btn primary" disabled={busy || password.length < 6}>
+            Save password
+          </button>
+        </form>
+      )}
       {c.configured && c.ready && !c.user && (
         <form
           onSubmit={(e) => {
@@ -81,7 +100,7 @@ function AccountCard() {
             void run(() => cloud.signIn(email, password));
           }}
         >
-          <p className="note">Sign in to back up your journal and sync it across your devices. Your local data is kept and merged.</p>
+          <p className="note">Sign in to back up your journal and sync it across your devices. Your local data is kept and merged. In the installed app, use your email and password: sign-in links open in Safari instead.</p>
           <div className="field">
             <label htmlFor="email">Email</label>
             <input id="email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -109,8 +128,8 @@ function AccountCard() {
             >
               Create account
             </button>
-            <button type="button" className="btn ghost" disabled={busy || !email} onClick={() => run(async () => (await cloud.magicLink(email), 'Magic link sent. Open it on this device.'))}>
-              Email me a sign-in link
+            <button type="button" className="btn ghost" disabled={busy || !email} onClick={() => run(async () => (await cloud.resetPassword(email), 'Reset email sent. Open the link, set a new password, then sign in here with it.'))}>
+              Forgot password
             </button>
           </div>
           <p className="small" style={{ marginTop: 8 }}>
@@ -118,7 +137,7 @@ function AccountCard() {
           </p>
         </form>
       )}
-      {c.configured && c.user && (
+      {c.configured && c.user && !c.recovery && (
         <>
           <div className="kv">
             <span className="k">Signed in as</span>
