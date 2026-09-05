@@ -7,6 +7,7 @@ import { store, updateWeek, useAppData } from '../web/app-store';
 import { cloud, useCloud } from '../web/cloud';
 import { SHORTCUT_NAME, reminders, shortcutEndpoint, useReminders } from '../web/reminders';
 import { buildJournalSyncPlist } from '../core/shortcut-plist';
+import { ACCENT_PRESETS, DEFAULT_ACCENT, loadAccent, saveAccent } from '../web/theme';
 import { daysLabel } from './Chips';
 import { GoalSheet, HabitSheet } from './EditorSheets';
 
@@ -24,8 +25,10 @@ export function SettingsScreen({ weekStart }: { weekStart: string }) {
       <h2 className="section-title">Settings</h2>
       <AccountCard />
       <RemindersCard />
+      <AppearanceCard />
       <TemplatesCard weekStart={weekStart} />
       <BackupCard />
+      <GuideCard />
       <section className="card">
         <div className="card-head">
           <h3 className="card-title">About</h3>
@@ -294,6 +297,86 @@ function RemindersCard() {
             </div>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+function AppearanceCard() {
+  const [accent, setAccent] = useState(loadAccent());
+  const pick = (hex: string) => {
+    setAccent(hex);
+    saveAccent(hex);
+  };
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h3 className="card-title">Appearance</h3>
+        <span className="hint">this device</span>
+      </div>
+      <div className="swatches" role="radiogroup" aria-label="Accent colour">
+        {ACCENT_PRESETS.map((p) => (
+          <button key={p.hex} type="button" role="radio" aria-checked={accent.toLowerCase() === p.hex} aria-label={p.name} className={`swatch${accent.toLowerCase() === p.hex ? ' on' : ''}`} style={{ background: p.hex }} onClick={() => pick(p.hex)} />
+        ))}
+      </div>
+      <div className="colorpick">
+        <input type="color" value={accent} onChange={(e) => pick(e.target.value)} aria-label="Custom accent colour" />
+        <span className="small">Pick any colour</span>
+        {accent !== DEFAULT_ACCENT && (
+          <button type="button" className="btn sm" onClick={() => pick(DEFAULT_ACCENT)}>
+            Reset
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function GuideCard() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h3 className="card-title">Setup guide</h3>
+        <button type="button" className="btn sm" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {!open && <p className="note">Step-by-step for a new person: install the app, create an account, connect Apple Reminders. Each person uses their own account and their own Apple ID.</p>}
+      {open && (
+        <ol className="steps">
+          <li>
+            <b>Install the app.</b> On your iPhone, open this page in Safari, tap Share, then <i>Add to Home Screen</i>. Open it from the icon from now on.
+          </li>
+          <li>
+            <b>Create your account.</b> Settings → Account & sync → enter an email and a password (6+ characters) → <i>Create account</i>. You are signed in straight away; your data syncs to any device you sign in on. Each person has their own account.
+          </li>
+          <li>
+            <b>Start the Reminders link.</b> Settings → Apple Reminders → <i>Set up Reminders sync</i>. This creates your personal sync key.
+          </li>
+          <li>
+            <b>Get your Shortcut file on a Mac.</b> On any Mac, open this same web address in Safari, sign in with <i>your</i> account, then Settings → Apple Reminders → <i>Show setup steps</i> → <i>Download Shortcut file</i>.
+          </li>
+          <li>
+            <b>Sign it.</b> In Terminal on that Mac:
+            <pre className="cmd">cd ~/Downloads &amp;&amp; shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"</pre>
+          </li>
+          <li>
+            <b>Send it to your iPhone.</b> AirDrop <i>Journal Sync (signed).shortcut</i> from the Mac to your iPhone and tap <i>Add Shortcut</i>. (Do not rely on the Mac's own iCloud sync if the Mac is signed in to someone else's Apple ID.)
+          </li>
+          <li>
+            <b>Allow it to run.</b> On the iPhone: Settings app → Shortcuts → Advanced → turn on <i>Allow Sharing Large Amounts of Data</i> and <i>Allow Deleting Without Confirmation</i>. Then open Shortcuts, run <b>Journal Sync</b> once and allow access to Reminders and to the journal's server (<i>Always Allow</i>).
+          </li>
+          <li>
+            <b>Check it worked.</b> Back in the app, Settings → Apple Reminders → <i>Refresh</i>. Your lists appear; choose which list feeds the to-do list and which one is Dinners.
+          </li>
+          <li>
+            <b>Keep it running.</b> Shortcuts → Automation → New → Time of Day → pick a few times → <i>Run immediately</i> → Journal Sync. <i>Sync now</i> in Settings runs it whenever you like.
+          </li>
+          <li>
+            <b>Make it yours.</b> Settings → Appearance for the colour, and Settings → Every-week template for the goals and habits that seed each new week.
+          </li>
+        </ol>
       )}
     </section>
   );
