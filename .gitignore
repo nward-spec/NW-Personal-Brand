@@ -17,3 +17,4 @@ venv/
 # App build output
 app/dist/
 app/dev-dist/
+app/supabase/.temp/

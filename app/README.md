@@ -15,7 +15,7 @@ as a PWA, works offline, and syncs across devices when signed in.
 | Notes                                | **Week** tab → Notes                                                                    |
 | Weekly habits with M–S dots          | **Week** tab → Weekly habits. Tap a dot; target text (x4, Sun–Thu) shown as a hint     |
 | Day columns, arrow to move an item   | **Days** tab. Tap to tick, dots/long-press → move to another day, edit, delete          |
-| Outfit scribbles per day             | **Days** tab → "Wear" line on each day                                                  |
+| Outfit scribbles per day             | **Days** tab → "OOTD" line on each day, with the night's dinner underneath it            |
 | Re-writing goals/habits each week    | **Settings** → Every-week template. New weeks are seeded from it automatically          |
 | Copying unfinished to-dos forward    | Automatic: unfinished to-dos roll into the next week when it is first opened            |
 

@@ -701,6 +701,33 @@ h2.section-title {
   clip: rect(0 0 0 0);
 }
 
+/* ---- Dinner line on a day card ---- */
+.outfit.dinner {
+  border-top: 1px dashed var(--border);
+  padding-top: 2px;
+  margin-bottom: 8px;
+}
+.outfit.dinner .meals {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.meal-btn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+.meal-btn.empty {
+  color: var(--muted);
+}
+.meal-btn.done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
 /* ---- Reminders ---- */
 .tag {
   display: inline-block;
