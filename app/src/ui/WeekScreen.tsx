@@ -20,7 +20,10 @@ import {
 } from '../core/model';
 import type { Goal, Habit } from '../core/types';
 import type { DayKey } from '../core/week';
-import { updateWeek, useWeek } from '../web/app-store';
+import { store, updateWeek, useAppData, useWeek } from '../web/app-store';
+import { DEFAULT_DINNERS_LIST, deleteReminder, renameReminder, setReminderDue, toggleReminder, undatedReminders } from '../core/reminders';
+import { useReminders } from '../web/reminders';
+import { weekDates } from '../core/week';
 import { DayPick, daysLabel } from './Chips';
 import { GoalSheet, HabitSheet, ItemSheet } from './EditorSheets';
 import { HabitGrid } from './HabitGrid';
@@ -30,7 +33,12 @@ type SheetState = { kind: 'todo'; id: string } | { kind: 'goal'; goal?: Goal } |
 
 export function WeekScreen({ weekStart }: { weekStart: string }) {
   const week = useWeek(weekStart);
+  const data = useAppData();
+  const { account } = useReminders();
+  const undated = undatedReminders(data, { excludeList: account?.dinnersList ?? DEFAULT_DINNERS_LIST });
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [rsheet, setRsheet] = useState<string | null>(null);
+  const rem = rsheet ? data.reminders[rsheet] : undefined;
   const close = () => setSheet(null);
   const edit = (fn: Parameters<typeof updateWeek>[1]) => updateWeek(weekStart, fn);
 
@@ -68,15 +76,29 @@ export function WeekScreen({ weekStart }: { weekStart: string }) {
           <h2 className="card-title" id="todos">
             To do list
           </h2>
-          {week.todos.length > 0 && (
+          {week.todos.length + undated.length > 0 && (
             <span className="hint">
-              {week.todos.filter((t) => t.done).length}/{week.todos.length}
+              {week.todos.filter((t) => t.done).length + undated.filter((r) => r.completed).length}/{week.todos.length + undated.length}
             </span>
           )}
         </div>
         <ul className="rows">
           {week.todos.map((t) => (
             <CheckRow key={t.id} done={t.done} text={t.text} onToggle={() => edit((w) => toggleTodo(w, t.id))} onMore={() => setSheet({ kind: 'todo', id: t.id })} />
+          ))}
+          {undated.map((r) => (
+            <CheckRow
+              key={r.uid}
+              done={r.completed}
+              text={r.title}
+              sub={
+                <>
+                  <span className={`tag${r.pending ? ' pending' : ''}`}>Reminders</span> {r.list}
+                </>
+              }
+              onToggle={() => store.updateReminder(r.uid, toggleReminder)}
+              onMore={() => setRsheet(r.uid)}
+            />
           ))}
         </ul>
         <AddRow placeholder="Add a to-do" onAdd={(text) => edit((w) => addTodo(w, text))} />
@@ -172,6 +194,28 @@ export function WeekScreen({ weekStart }: { weekStart: string }) {
           />
           <p className="note">Moves it off the to-do list and onto {`that day's`} plan.</p>
         </div>
+      </ItemSheet>
+
+      <ItemSheet
+        open={!!rem}
+        title={rem ? `Reminder · ${rem.list}` : ''}
+        text={rem?.title ?? ''}
+        onClose={() => setRsheet(null)}
+        onSave={(text) => rem && store.updateReminder(rem.uid, (r) => renameReminder(r, text))}
+        onDelete={() => rem && store.updateReminder(rem.uid, deleteReminder)}
+      >
+        {rem && (
+          <div className="section">
+            <div className="card-title">Give it a day</div>
+            <DayPick
+              onPick={(day) => {
+                store.updateReminder(rem.uid, (r) => setReminderDue(r, weekDates(weekStart)[['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(day)]));
+                setRsheet(null);
+              }}
+            />
+            <p className="note">Sets the due date in Apple Reminders, so it moves onto that day.</p>
+          </div>
+        )}
       </ItemSheet>
 
       <GoalSheet

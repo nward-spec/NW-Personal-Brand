@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-export type Tab = 'week' | 'days' | 'settings';
+export type Tab = 'week' | 'days' | 'dinners' | 'settings';
 
 const icons: Record<Tab, JSX.Element> = {
   week: (
@@ -15,6 +15,11 @@ const icons: Record<Tab, JSX.Element> = {
       <circle cx="19" cy="18" r="1.2" fill="currentColor" stroke="none" />
     </svg>
   ),
+  dinners: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 3v7a3 3 0 0 0 3 3v8M7 3v7M10 3v7M17 3c-2 1-3 3.5-3 6v3h3v9" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
@@ -23,7 +28,7 @@ const icons: Record<Tab, JSX.Element> = {
   ),
 };
 
-const labels: Record<Tab, string> = { week: 'Week', days: 'Days', settings: 'Settings' };
+const labels: Record<Tab, string> = { week: 'Week', days: 'Days', dinners: 'Dinners', settings: 'Settings' };
 
 export function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   return (

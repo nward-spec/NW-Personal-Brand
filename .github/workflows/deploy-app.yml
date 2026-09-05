@@ -30,6 +30,12 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+      # Creates the Pages site on first run if the token is allowed to; otherwise
+      # enable it once under Settings -> Pages -> Source: GitHub Actions.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -66,6 +66,15 @@ if (supabase) {
   document.addEventListener('visibilitychange', resync);
 }
 
+/** Non-React access to the cloud state (used by the reminders controller). */
+export const cloudStore = {
+  get: () => state,
+  subscribe: (l: () => void) => {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+};
+
 export function useCloud(): CloudState {
   return useSyncExternalStore(
     (l) => {

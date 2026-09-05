@@ -5,6 +5,7 @@ import type { GoalTemplate, HabitTemplate } from '../core/types';
 import { newId } from '../core/types';
 import { store, updateWeek, useAppData } from '../web/app-store';
 import { cloud, useCloud } from '../web/cloud';
+import { reminders, useReminders } from '../web/reminders';
 import { daysLabel } from './Chips';
 import { GoalSheet, HabitSheet } from './EditorSheets';
 
@@ -21,6 +22,7 @@ export function SettingsScreen({ weekStart }: { weekStart: string }) {
     <>
       <h2 className="section-title">Settings</h2>
       <AccountCard />
+      <RemindersCard />
       <TemplatesCard weekStart={weekStart} />
       <BackupCard />
       <section className="card">
@@ -133,6 +135,123 @@ function AccountCard() {
             </button>
             <button type="button" className="btn ghost" disabled={busy} onClick={() => run(() => cloud.signOut())}>
               Sign out
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function RemindersCard() {
+  const c = useCloud();
+  const r = useReminders();
+  const [appleId, setAppleId] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const run = async (fn: () => Promise<string | void>) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const m = await fn();
+      if (m) setMessage(m);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'never');
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h3 className="card-title">Apple Reminders</h3>
+        {r.account && <span className="hint">{r.syncing ? 'Syncing…' : `Synced ${fmt(r.account.lastSyncAt)}`}</span>}
+      </div>
+      {!c.configured && <p className="note">Needs cloud sync, which is not configured in this build.</p>}
+      {c.configured && !c.user && <p className="note">Sign in above first. Reminders sync runs on the server, so it needs your account.</p>}
+      {c.configured && c.user && !r.account && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const res = await reminders.connect(appleId, password);
+              setPassword('');
+              return res ? `Connected. Found ${res.lists.length} list${res.lists.length === 1 ? '' : 's'}: ${res.lists.join(', ')}.` : 'Connected.';
+            });
+          }}
+        >
+          <p className="note">
+            Reminders with a due date appear on that day, undated ones on the to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders too.
+          </p>
+          <p className="note">
+            Use an <b>app-specific password</b>, not your Apple ID password: at account.apple.com → Sign-In and Security → App-Specific Passwords. It is stored encrypted on the server and never on this device.
+          </p>
+          <div className="field">
+            <label htmlFor="apple-id">Apple ID (email)</label>
+            <input id="apple-id" type="email" inputMode="email" autoComplete="username" value={appleId} onChange={(e) => setAppleId(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label htmlFor="apple-pass">App-specific password</label>
+            <input id="apple-pass" type="password" autoComplete="off" placeholder="xxxx-xxxx-xxxx-xxxx" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          {error && <p className="error">{error}</p>}
+          {message && <p className="ok">{message}</p>}
+          <button type="submit" className="btn primary" disabled={busy || r.syncing || !appleId || !password}>
+            {busy || r.syncing ? 'Connecting…' : 'Connect'}
+          </button>
+        </form>
+      )}
+      {c.configured && c.user && r.account && (
+        <>
+          <div className="kv">
+            <span className="k">Apple ID</span>
+            <span>{r.account.appleId}</span>
+          </div>
+          <div className="kv">
+            <span className="k">Lists</span>
+            <span>{r.account.lists.length ? r.account.lists.join(', ') : '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="k">Dinners list</span>
+            <select value={r.account.dinnersList} onChange={(e) => run(() => reminders.setDinnersList(e.target.value))} aria-label="Dinners list" style={{ font: 'inherit', padding: '6px 8px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'inherit' }}>
+              {[r.account.dinnersList, ...r.account.lists.filter((l) => l !== r.account?.dinnersList)].map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+          {r.last && (
+            <div className="kv">
+              <span className="k">Last sync</span>
+              <span>
+                {r.last.pulled} pulled · {r.last.pushed} pushed
+              </span>
+            </div>
+          )}
+          {(r.error || r.account.lastError) && <p className="error">{r.error ?? r.account.lastError}</p>}
+          {error && <p className="error">{error}</p>}
+          {message && <p className="ok">{message}</p>}
+          <div className="btnrow">
+            <button type="button" className="btn" disabled={busy || r.syncing} onClick={() => run(async () => (await reminders.syncNow(), 'Synced.'))}>
+              {r.syncing ? 'Syncing…' : 'Sync now'}
+            </button>
+            <button
+              type="button"
+              className="btn ghost danger"
+              disabled={busy || r.syncing}
+              onClick={() => {
+                if (window.confirm('Disconnect Apple Reminders? Reminders disappear from the app; nothing is deleted in Apple Reminders.')) void run(() => reminders.disconnect());
+              }}
+            >
+              Disconnect
             </button>
           </div>
         </>

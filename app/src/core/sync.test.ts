@@ -33,7 +33,7 @@ describe('SyncEngine', () => {
   it('pulls remote data, then pushes local-only documents', async () => {
     const r = fakeRemote();
     r.weeks.set('2026-03-09', emptyWeek('2026-03-09', '2026-03-09T00:00:00.000Z'));
-    const store = new Store({ weeks: { '2026-03-16': emptyWeek('2026-03-16', '2026-03-16T00:00:00.000Z') }, templates: emptyTemplates('2026-01-01T00:00:00.000Z') });
+    const store = new Store({ weeks: { '2026-03-16': emptyWeek('2026-03-16', '2026-03-16T00:00:00.000Z') }, templates: emptyTemplates('2026-01-01T00:00:00.000Z'), reminders: {} });
     const engine = new SyncEngine(store, r.remote, { debounceMs: 0 });
     await engine.start();
     expect(Object.keys(store.get().weeks).sort()).toEqual(['2026-03-09', '2026-03-16']);
@@ -63,7 +63,7 @@ describe('SyncEngine', () => {
     const r = fakeRemote();
     r.weeks.set('2026-03-16', emptyWeek('2026-03-16', '2026-03-16T00:00:00.000Z'));
     const local = { ...addTodo(emptyWeek('2026-03-16', '2026-03-16T00:00:00.000Z'), 'Pack'), updatedAt: '2026-03-17T00:00:00.000Z' };
-    const store = new Store({ weeks: { '2026-03-16': local }, templates: emptyTemplates() });
+    const store = new Store({ weeks: { '2026-03-16': local }, templates: emptyTemplates(), reminders: {} });
     const engine = new SyncEngine(store, r.remote, { debounceMs: 0 });
     await engine.start();
     expect(store.get().weeks['2026-03-16'].todos).toHaveLength(1);

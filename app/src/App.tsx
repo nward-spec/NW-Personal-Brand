@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { formatWeekMonth, todayISO, weekStartOf } from './core/week';
 import { store } from './web/app-store';
 import { useCloud } from './web/cloud';
+import './web/reminders';
 import { DaysScreen } from './ui/DaysScreen';
+import { DinnersScreen } from './ui/DinnersScreen';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { TabBar, type Tab } from './ui/TabBar';
 import { WeekNav } from './ui/WeekNav';
@@ -13,7 +15,7 @@ const TAB_KEY = 'weekly-journal:tab';
 function readTab(): Tab {
   try {
     const t = localStorage.getItem(TAB_KEY);
-    if (t === 'week' || t === 'days' || t === 'settings') return t;
+    if (t === 'week' || t === 'days' || t === 'dinners' || t === 'settings') return t;
   } catch {
     /* ignore */
   }
@@ -109,6 +111,7 @@ export default function App() {
       <main>
         {tab === 'week' && <WeekScreen weekStart={weekStart} />}
         {tab === 'days' && <DaysScreen weekStart={weekStart} />}
+        {tab === 'dinners' && <DinnersScreen weekStart={weekStart} />}
         {tab === 'settings' && <SettingsScreen weekStart={weekStart} />}
       </main>
       <TabBar tab={tab} onChange={changeTab} />

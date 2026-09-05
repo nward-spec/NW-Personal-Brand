@@ -65,9 +65,38 @@ export interface Templates {
   updatedAt: string;
 }
 
+/**
+ * A reminder mirrored from Apple Reminders (iCloud CalDAV). Rows are synced
+ * per item: the app edits a row and marks it `pending`; the server-side sync
+ * pushes the change to iCloud, then rewrites the row with `pending: null`.
+ */
+export interface ReminderRow {
+  /** iCalendar UID; stable across devices. */
+  uid: string;
+  /** Reminders list name, e.g. "Reminders" or "Dinners". */
+  list: string;
+  /** CalDAV collection href of the list (set by the server). */
+  listHref?: string;
+  /** CalDAV object href and ETag (set by the server). */
+  href?: string;
+  etag?: string;
+  title: string;
+  notes: string;
+  /** Due date as YYYY-MM-DD, or null for an undated reminder. */
+  due: string | null;
+  completed: boolean;
+  completedAt?: string | null;
+  /** True once the reminder is gone from iCloud (kept as a tombstone). */
+  deleted: boolean;
+  /** Change waiting to be pushed to iCloud. */
+  pending: 'create' | 'update' | 'delete' | null;
+  updatedAt: string;
+}
+
 export interface AppData {
   weeks: Record<string, WeekDoc>;
   templates: Templates;
+  reminders: Record<string, ReminderRow>;
 }
 
 export function newId(): string {

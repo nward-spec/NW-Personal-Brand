@@ -1,7 +1,7 @@
 // Local persistence through a minimal key/value interface, so the same code
 // works with localStorage on the web and AsyncStorage-style adapters in Expo.
 
-import { defaultData, isTemplates, isWeekDoc, normaliseWeek } from './model';
+import { defaultData, isReminderRow, isTemplates, isWeekDoc, normaliseReminder, normaliseWeek } from './model';
 import type { Store } from './store';
 import type { AppData } from './types';
 
@@ -24,6 +24,11 @@ export function parseAppData(raw: unknown): AppData | null {
     }
   }
   if (isTemplates(obj.templates)) data.templates = obj.templates;
+  if (obj.reminders && typeof obj.reminders === 'object') {
+    for (const [uid, row] of Object.entries(obj.reminders)) {
+      if (isReminderRow(row) && row.uid === uid) data.reminders[uid] = normaliseReminder(row);
+    }
+  }
   return data;
 }
 

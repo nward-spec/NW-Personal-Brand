@@ -2,12 +2,13 @@
 // useSyncExternalStore; an Expo app could use the exact same file.
 
 import { createWeekFromTemplates, defaultData, mostRecentWeekBefore } from './model';
-import type { AppData, Templates, WeekDoc } from './types';
+import type { AppData, ReminderRow, Templates, WeekDoc } from './types';
 
 export type Listener = () => void;
 export type DirtyListener = (key: string) => void;
 
 export const weekKey = (weekStart: string) => `week:${weekStart}`;
+export const reminderKey = (uid: string) => `reminder:${uid}`;
 export const TEMPLATES_KEY = 'templates';
 
 export class Store {
@@ -58,6 +59,20 @@ export class Store {
     this.data = { ...this.data, templates };
     this.emit();
     if (opts.dirty !== false) this.markDirty(TEMPLATES_KEY);
+  }
+
+  setReminder(row: ReminderRow, opts: { dirty?: boolean } = {}) {
+    this.data = { ...this.data, reminders: { ...this.data.reminders, [row.uid]: row } };
+    this.emit();
+    if (opts.dirty !== false) this.markDirty(reminderKey(row.uid));
+  }
+
+  /** Apply a pure update to a reminder row. No-op if it does not exist. */
+  updateReminder(uid: string, fn: (row: ReminderRow) => ReminderRow) {
+    const current = this.data.reminders[uid];
+    if (!current) return;
+    const next = fn(current);
+    if (next !== current) this.setReminder(next);
   }
 
   /** Get a week, creating it from the templates if it does not exist yet. */

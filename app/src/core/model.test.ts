@@ -133,7 +133,7 @@ describe('mergeData', () => {
     const older = emptyWeek('2026-03-16', '2026-03-16T01:00:00.000Z');
     const newer = emptyWeek('2026-03-16', '2026-03-16T02:00:00.000Z');
     const localOnly = emptyWeek('2026-03-09', '2026-03-09T00:00:00.000Z');
-    const local = { weeks: { '2026-03-16': older, '2026-03-09': localOnly }, templates: { ...templates, updatedAt: '2026-02-01T00:00:00.000Z' } };
+    const local = { weeks: { '2026-03-16': older, '2026-03-09': localOnly }, templates: { ...templates, updatedAt: '2026-02-01T00:00:00.000Z' }, reminders: {} };
     const incoming = { weeks: { '2026-03-16': newer }, templates };
     const { merged, localNewer, incomingNewer } = mergeData(local, incoming);
     expect(merged.weeks['2026-03-16'].updatedAt).toBe(newer.updatedAt);

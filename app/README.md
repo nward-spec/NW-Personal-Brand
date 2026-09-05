@@ -36,6 +36,35 @@ Without Supabase configured the app runs in **local-only mode**: everything is
 saved in the browser's storage on that device. Settings → Backup can export and
 import a JSON file.
 
+## Apple Reminders (two-way) and the Dinners tab
+
+Reminders are mirrored through iCloud's CalDAV interface by the
+`reminders-sync` edge function, the only component that talks to Apple.
+
+- Reminders with a due date show on that day in **Days**; undated ones show on
+  the **Week** to-do list. Ticking, renaming, moving to another day, or
+  deleting in the app changes the reminder in Apple Reminders.
+- The **Dinners** tab is one Reminders list (default "Dinners", changeable in
+  Settings): a reminder due on a night is that night's dinner, undated ones are
+  ideas. Planning a dinner creates or re-dates a reminder in that list.
+- Connect in Settings → Apple Reminders with your Apple ID and an
+  **app-specific password** (account.apple.com → Sign-In and Security →
+  App-Specific Passwords). The password is AES-encrypted with the function's
+  `ICLOUD_KEY` secret before it is stored; the app never receives it back.
+- Sync runs when the app opens or returns to the foreground, a couple of
+  seconds after any reminder edit, and from "Sync now". Each run reads all
+  reminder lists, pushes pending edits (with `If-Match` ETags), then rewrites
+  changed rows. Completed reminders older than 60 days are left alone.
+
+Files: `supabase/functions/reminders-sync/` (`ics.ts` VTODO parsing/patching,
+`caldav.ts` client, `sync.ts` orchestrator, `crypto.ts`, `index.ts` entry);
+tests run with the rest of `npm test`.
+
+Caveat: Apple documents no third-party API for Reminders. CalDAV access to
+reminders has worked for years but is not guaranteed by Apple; if iCloud stops
+exposing lists over CalDAV, the "Connect" step reports it and the fallback is
+an iPhone Shortcut that talks to the same tables.
+
 ## Cloud sync (Supabase)
 
 1. Create a project at supabase.com.
@@ -54,6 +83,19 @@ Sync model: each week is one JSON document, plus one for the template.
 Edits are saved locally first, queued, and pushed after a short delay; the
 queue survives reloads, so offline edits sync later. On launch, focus, or
 reconnect the app pulls and merges by last-write-wins per document.
+
+### Automated setup
+
+With a Supabase personal access token (supabase.com/dashboard/account/tokens):
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_... SITE_URL=https://<owner>.github.io/<repo>/ node scripts/deploy-supabase.mjs
+```
+
+This creates or reuses a project named `weekly-journal`, applies the schema,
+sets `ICLOUD_KEY`, deploys the edge function, turns on instant sign-up, and
+writes `.env.production` (committed; the anon key is public by design and row
+level security protects the data).
 
 ## Deploy (GitHub Pages)
 

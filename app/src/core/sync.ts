@@ -10,13 +10,14 @@
 
 import { mergeData } from './model';
 import type { KVStorage } from './persist';
-import { TEMPLATES_KEY, type Store, weekKey } from './store';
-import type { Templates, WeekDoc } from './types';
+import { TEMPLATES_KEY, reminderKey, type Store, weekKey } from './store';
+import type { ReminderRow, Templates, WeekDoc } from './types';
 
 export interface RemoteStore {
-  fetchAll(): Promise<{ weeks: WeekDoc[]; templates: Templates | null }>;
+  fetchAll(): Promise<{ weeks: WeekDoc[]; templates: Templates | null; reminders?: ReminderRow[] }>;
   upsertWeeks(weeks: WeekDoc[]): Promise<void>;
   upsertTemplates(templates: Templates): Promise<void>;
+  upsertReminders?(rows: ReminderRow[]): Promise<void>;
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
@@ -124,10 +125,13 @@ export class SyncEngine {
     const remote = await this.remote.fetchAll();
     const weeks: Record<string, WeekDoc> = {};
     for (const w of remote.weeks) weeks[w.weekStart] = w;
-    const { merged, localNewer } = mergeData(this.store.get(), { weeks, templates: remote.templates ?? undefined });
+    const reminders: Record<string, ReminderRow> = {};
+    for (const r of remote.reminders ?? []) reminders[r.uid] = r;
+    const { merged, localNewer } = mergeData(this.store.get(), { weeks, templates: remote.templates ?? undefined, reminders });
     for (const key of localNewer) this.dirty.add(key);
     // Documents the remote has never seen must be pushed too.
     for (const key of Object.keys(merged.weeks)) if (!weeks[key]) this.dirty.add(weekKey(key));
+    for (const uid of Object.keys(merged.reminders)) if (!reminders[uid]) this.dirty.add(reminderKey(uid));
     if (!remote.templates) this.dirty.add(TEMPLATES_KEY);
     this.savePending();
     this.store.replace(merged);
@@ -142,17 +146,28 @@ export class SyncEngine {
     for (const w of weeks) stamps.set(weekKey(w.weekStart), w.updatedAt);
     const pushTemplates = this.dirty.has(TEMPLATES_KEY);
     if (pushTemplates) stamps.set(TEMPLATES_KEY, data.templates.updatedAt);
+    const reminderKeys = [...this.dirty].filter((k) => k.startsWith('reminder:'));
+    const reminders = reminderKeys.map((k) => data.reminders[k.slice('reminder:'.length)]).filter((r): r is ReminderRow => !!r);
+    for (const r of reminders) stamps.set(reminderKey(r.uid), r.updatedAt);
 
     if (weeks.length) await this.remote.upsertWeeks(weeks);
     if (pushTemplates) await this.remote.upsertTemplates(data.templates);
+    if (reminders.length && this.remote.upsertReminders) await this.remote.upsertReminders(reminders);
 
     // Only clear keys that were not edited again while the request was in flight.
     const after = this.store.get();
+    const stampOf = (key: string) => {
+      if (key === TEMPLATES_KEY) return after.templates.updatedAt;
+      if (key.startsWith('reminder:')) return after.reminders[key.slice('reminder:'.length)]?.updatedAt;
+      return after.weeks[key.slice('week:'.length)]?.updatedAt;
+    };
     for (const [key, stamp] of stamps) {
-      const current = key === TEMPLATES_KEY ? after.templates.updatedAt : after.weeks[key.slice('week:'.length)]?.updatedAt;
+      const current = stampOf(key);
       if (current === stamp || current === undefined) this.dirty.delete(key);
     }
     for (const key of weekKeys) if (!data.weeks[key.slice('week:'.length)]) this.dirty.delete(key);
+    for (const key of reminderKeys) if (!data.reminders[key.slice('reminder:'.length)]) this.dirty.delete(key);
+    if (!this.remote.upsertReminders) for (const key of reminderKeys) this.dirty.delete(key);
     this.savePending();
   }
 

@@ -3,7 +3,7 @@
 // sync layer can rely on timestamps alone.
 
 import { DAY_KEYS, type DayKey, nowISO } from './week';
-import { newId, type AppData, type Day, type Goal, type Habit, type Item, type Templates, type WeekDoc } from './types';
+import { newId, type AppData, type Day, type Goal, type Habit, type Item, type ReminderRow, type Templates, type WeekDoc } from './types';
 
 export const PRIORITY_SLOTS = 3;
 
@@ -35,7 +35,7 @@ export function emptyTemplates(now: string = nowISO()): Templates {
 }
 
 export function defaultData(): AppData {
-  return { weeks: {}, templates: emptyTemplates() };
+  return { weeks: {}, templates: emptyTemplates(), reminders: {} };
 }
 
 /** Apply `fn` to a copy of the week and stamp the result. */
@@ -286,7 +286,7 @@ export function mutateTemplates(t: Templates, fn: (draft: Templates) => void, no
 
 export interface MergeResult {
   merged: AppData;
-  /** Keys ("week:YYYY-MM-DD" | "templates") where the local copy was newer. */
+  /** Keys ("week:YYYY-MM-DD" | "templates" | "reminder:<uid>") where the local copy was newer. */
   localNewer: string[];
   /** Keys where the incoming copy won. */
   incomingNewer: string[];
@@ -294,9 +294,19 @@ export interface MergeResult {
 
 /** Last-write-wins merge of two data sets by `updatedAt`. */
 export function mergeData(local: AppData, incoming: Partial<AppData>): MergeResult {
-  const merged: AppData = { weeks: { ...local.weeks }, templates: local.templates };
+  const merged: AppData = { weeks: { ...local.weeks }, templates: local.templates, reminders: { ...local.reminders } };
   const localNewer: string[] = [];
   const incomingNewer: string[] = [];
+
+  for (const [uid, row] of Object.entries(incoming.reminders ?? {})) {
+    const mine = merged.reminders[uid];
+    if (!mine || row.updatedAt > mine.updatedAt) {
+      merged.reminders[uid] = row;
+      incomingNewer.push(`reminder:${uid}`);
+    } else if (mine.updatedAt > row.updatedAt) {
+      localNewer.push(`reminder:${uid}`);
+    }
+  }
 
   for (const [key, week] of Object.entries(incoming.weeks ?? {})) {
     const mine = merged.weeks[key];
@@ -323,6 +333,30 @@ export function isWeekDoc(v: unknown): v is WeekDoc {
   if (!v || typeof v !== 'object') return false;
   const w = v as Partial<WeekDoc>;
   return typeof w.weekStart === 'string' && typeof w.updatedAt === 'string' && Array.isArray(w.todos) && !!w.days && typeof w.days === 'object';
+}
+
+export function isReminderRow(v: unknown): v is ReminderRow {
+  if (!v || typeof v !== 'object') return false;
+  const r = v as Partial<ReminderRow>;
+  return typeof r.uid === 'string' && typeof r.title === 'string' && typeof r.list === 'string' && typeof r.updatedAt === 'string';
+}
+
+export function normaliseReminder(r: ReminderRow): ReminderRow {
+  return {
+    uid: r.uid,
+    list: r.list,
+    listHref: r.listHref,
+    href: r.href,
+    etag: r.etag,
+    title: r.title,
+    notes: typeof r.notes === 'string' ? r.notes : '',
+    due: typeof r.due === 'string' && r.due ? r.due.slice(0, 10) : null,
+    completed: !!r.completed,
+    completedAt: r.completedAt ?? null,
+    deleted: !!r.deleted,
+    pending: r.pending ?? null,
+    updatedAt: r.updatedAt,
+  };
 }
 
 export function isTemplates(v: unknown): v is Templates {

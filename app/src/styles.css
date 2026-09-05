@@ -652,7 +652,7 @@ td.today .dot:not(.on)::before {
   max-width: 540px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   height: var(--tab-h);
 }
 .tab {
@@ -699,4 +699,62 @@ h2.section-title {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* ---- Reminders ---- */
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  vertical-align: middle;
+}
+.tag.pending {
+  background: transparent;
+  border: 1px dashed var(--accent);
+}
+.dinner-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  border-top: 1px solid var(--border);
+}
+.dinner-row:first-child {
+  border-top: 0;
+}
+.dinner-row .day {
+  font-weight: 700;
+  line-height: 1.1;
+}
+.dinner-row .day small {
+  display: block;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+}
+.dinner-row.today .day {
+  color: var(--accent);
+}
+.dinner-row .meal {
+  text-align: left;
+  padding: 8px 0;
+  min-width: 0;
+}
+.dinner-row .meal .empty-meal {
+  color: var(--muted);
+}
+.dinner-row .meal .done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.ideas .chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
 }
