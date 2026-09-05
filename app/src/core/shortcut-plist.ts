@@ -88,6 +88,7 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
   const LOOP2 = uuid();
   const FIELDS = uuid();
   const OP = uuid();
+  const IDX = uuid();
   const ARG2 = uuid();
   const ARG3 = uuid();
   const ARG4 = uuid();
@@ -177,19 +178,22 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
     action('text.split', { UUID: LINES, text: attachment(output(RESPONSE, 'Contents of URL')), WFTextSeparatorType: 'New Lines' }),
     action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 0, WFInput: attachment(output(LINES, 'Split Text')) }),
     action('text.split', { UUID: FIELDS, text: attachment(repeatItem()), WFTextSeparatorType: 'Custom', WFTextCustomSeparator: ' | ' }),
+    // Only the command word is read unconditionally: an empty reply (nothing to
+    // do) or an error message still loops once, and must not fail on "item 2".
     item(FIELDS, 'Split Text', 1, OP),
-    item(FIELDS, 'Split Text', 2, ARG2),
-    item(FIELDS, 'Split Text', 3, ARG3),
-    item(FIELDS, 'Split Text', 4, ARG4),
 
     // delete | n | title
     ifStart(IF_DELETE, output(OP, 'Item from List'), IS, 'delete'),
-    item(REM, 'Reminders', output(ARG2, 'Item from List'), TARGET),
+    item(FIELDS, 'Split Text', 2, IDX),
+    item(REM, 'Reminders', output(IDX, 'Item from List'), TARGET),
     action('removereminders', { WFInputReminders: attachment(output(TARGET, 'Item from List')) }),
     ifEnd(IF_DELETE),
 
     // create | list | title | due
     ifStart(IF_CREATE, output(OP, 'Item from List'), IS, 'create'),
+    item(FIELDS, 'Split Text', 2, ARG2),
+    item(FIELDS, 'Split Text', 3, ARG3),
+    item(FIELDS, 'Split Text', 4, ARG4),
     ifStart(IF_DUE, output(ARG4, 'Item from List'), HAS_ANY_VALUE),
     action('addnewreminder', {
       WFCalendarItemTitle: tokenText([output(ARG3, 'Item from List')]),
