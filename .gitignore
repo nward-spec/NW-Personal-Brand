@@ -18,3 +18,4 @@ venv/
 app/dist/
 app/dev-dist/
 app/supabase/.temp/
+Journal Sync*.shortcut

@@ -805,3 +805,16 @@ ol.steps code {
 .field .btn.sm {
   align-self: flex-start;
 }
+
+pre.cmd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  margin: 6px 0 0;
+  -webkit-user-select: all;
+  user-select: all;
+}

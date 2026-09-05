@@ -43,12 +43,17 @@ a private store only the Reminders app can read), so the bridge is a small
 **iPhone Shortcut** rather than a server-side connection.
 
 - Settings → Apple Reminders → "Set up Reminders sync" creates a per-user
-  token and shows the steps to build the Shortcut (named `Journal Sync`).
+  token, and "Download Shortcut file" generates `Journal Sync.shortcut`
+  (`src/core/shortcut-plist.ts`, also `scripts/make-shortcut.mjs`). iOS only
+  installs signed shortcut files: sign it on a Mac with
+  `shortcuts sign --mode anyone --input … --output …`, open it there, and
+  iCloud puts it on the phone.
 - The Shortcut posts a snapshot of the reminders (title, list, due date,
   completed) to the `reminders-shortcut` edge function and receives commands
-  back: `complete`, `create`, `delete`. Renames, date changes and un-ticking
-  are sent as delete + create. Reminders are matched by list + title, the only
-  stable handle Shortcuts exposes.
+  back: `delete | <line> | title` and `create | list | title | due`. Ticking
+  in the app removes the reminder from the phone (the app keeps it as done);
+  renames, date changes and un-ticking are delete + create. Reminders are
+  matched by list + title, the only stable handle Shortcuts exposes.
 - Dated reminders show on that day in **Days**; undated ones on the **Week**
   to-do list. The **Dinners** tab and the Dinner line on each day card use one
   list (default "Dinners", changeable in Settings).

@@ -6,6 +6,7 @@ import { newId } from '../core/types';
 import { store, updateWeek, useAppData } from '../web/app-store';
 import { cloud, useCloud } from '../web/cloud';
 import { SHORTCUT_NAME, reminders, shortcutEndpoint, useReminders } from '../web/reminders';
+import { buildJournalSyncPlist } from '../core/shortcut-plist';
 import { daysLabel } from './Chips';
 import { GoalSheet, HabitSheet } from './EditorSheets';
 
@@ -143,6 +144,18 @@ function AccountCard() {
   );
 }
 
+function downloadShortcut(token: string) {
+  const blob = new Blob([buildJournalSyncPlist({ endpoint: shortcutEndpoint(), token })], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${SHORTCUT_NAME}.shortcut`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function RemindersCard() {
   const c = useCloud();
   const r = useReminders();
@@ -165,15 +178,6 @@ function RemindersCard() {
     }
   };
 
-  const copy = async (label: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setMessage(`${label} copied.`);
-    } catch {
-      setError(`Could not copy. Long-press the ${label.toLowerCase()} to select it.`);
-    }
-  };
-
   const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'never');
 
   return (
@@ -190,7 +194,7 @@ function RemindersCard() {
             Reminders sync through a small Shortcut on your iPhone. Reminders with a due date appear on that day, undated ones on the to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders when the Shortcut next runs.
           </p>
           {error && <p className="error">{error}</p>}
-          <button type="button" className="btn primary" disabled={busy} onClick={() => run(async () => (await reminders.connect(), setShowSteps(true), 'Ready. Follow the steps below to build the Shortcut.'))}>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => run(async () => (await reminders.connect(), setShowSteps(true), 'Ready. Follow the steps below to install the Shortcut.'))}>
             Set up Reminders sync
           </button>
         </>
@@ -245,52 +249,33 @@ function RemindersCard() {
           {showSteps && (
             <div className="section">
               <p className="note">
-                Build this once in the <b>Shortcuts</b> app on your iPhone. Name it exactly <b>{SHORTCUT_NAME}</b>. Then add an Automation (Time of Day, e.g. 7 am, 1 pm and 8 pm, "Run immediately") that runs it, and use <b>Sync now</b> above whenever you want it right away.
+                The Shortcut is generated for you; nothing to build by hand. iOS only installs <b>signed</b> Shortcut files, and signing happens on a Mac.
               </p>
-              <div className="field">
-                <label>Your sync link (step 5)</label>
-                <input readOnly value={shortcutEndpoint()} onFocus={(e) => e.currentTarget.select()} />
-                <button type="button" className="btn sm" onClick={() => copy('Link', shortcutEndpoint())}>
-                  Copy link
-                </button>
-              </div>
-              <div className="field">
-                <label>Your token (step 5, after "Bearer ")</label>
-                <input readOnly value={r.account.token} onFocus={(e) => e.currentTarget.select()} />
-                <button type="button" className="btn sm" onClick={() => copy('Token', r.account!.token)}>
-                  Copy token
-                </button>
-              </div>
               <ol className="steps">
                 <li>
-                  <b>Find Reminders</b>. Turn on Sort by → <i>Creation Date</i>, Order → <i>Latest First</i>, Limit → 400. No other filters.
+                  On your Mac, open this app in Safari, sign in, and tap <b>Download Shortcut file</b> below. It saves <i>Journal Sync.shortcut</i> to Downloads.
                 </li>
                 <li>
-                  <b>Repeat with each</b> item in Reminders. Inside it, add a <b>Text</b> action containing, on one line: <i>Repeat Item</i> (Title) <code> | </code> <i>Repeat Item</i> (List) <code> | </code> <i>Repeat Item</i> (Due Date) <code> | </code> <i>Repeat Item</i> (Is Completed). Tap each inserted Repeat Item variable to pick the property in brackets. Separate them with space, vertical bar, space.
+                  Open <b>Terminal</b> and paste:
+                  <pre className="cmd">cd ~/Downloads &amp;&amp; shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"</pre>
                 </li>
                 <li>
-                  After the repeat: <b>Combine Text</b> → Repeat Results, with <i>New Lines</i>.
+                  Double-click <i>Journal Sync (signed).shortcut</i> to add it to Shortcuts on the Mac. iCloud syncs it to your iPhone within a minute.
                 </li>
                 <li>
-                  <b>Get Contents of URL</b>: URL = the sync link above. Method <i>POST</i>. Headers: <i>Authorization</i> = <code>Bearer </code> followed by your token. Request Body → <i>File</i> → the Combined Text.
+                  On the iPhone, open Shortcuts and run <b>Journal Sync</b> once to allow access to Reminders. Then come back here and tap <b>Refresh</b>.
                 </li>
                 <li>
-                  <b>Split Text</b> the Contents of URL by <i>New Lines</i>, then <b>Repeat with each</b> item in that.
-                </li>
-                <li>
-                  Inside: <b>Split Text</b> the Repeat Item by <i>Custom</i> = space, vertical bar, space. Then four <b>Get Item from List</b> actions: item 1 → call it Op, 2 → List, 3 → Title, 4 → Due (set each as a variable with <b>Set Variable</b>).
-                </li>
-                <li>
-                  <b>If</b> Op <i>is</i> <code>complete</code>: <b>Find Reminders</b> where Title <i>is</i> Title and List <i>is</i> List → <b>Edit Reminder</b>: Set <i>Is Completed</i> of Reminders to <i>Yes</i>. End If.
-                </li>
-                <li>
-                  <b>If</b> Op <i>is</i> <code>create</code>: <b>Add New Reminder</b> with Title, in list List, Due Date → Due (turn on the date option and pick the Due variable). End If.
-                </li>
-                <li>
-                  <b>If</b> Op <i>is</i> <code>delete</code>: <b>Find Reminders</b> where Title <i>is</i> Title and List <i>is</i> List → <b>Remove Reminders</b>. End If.
+                  Optional: Shortcuts → Automation → New → Time of Day, pick a few times, choose "Run immediately", and select Journal Sync. <b>Sync now</b> above runs it on demand.
                 </li>
               </ol>
-              <p className="note">Run it once from the Shortcuts app to grant Reminders access, then come back here and tap Refresh: your lists appear above and reminders show on their days.</p>
+              <button type="button" className="btn" onClick={() => run(async () => (downloadShortcut(r.account!.token), 'Shortcut file downloading.'))}>
+                Download Shortcut file
+              </button>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label>Sync token (already inside the file)</label>
+                <input readOnly value={r.account.token} onFocus={(e) => e.currentTarget.select()} />
+              </div>
             </div>
           )}
         </>
