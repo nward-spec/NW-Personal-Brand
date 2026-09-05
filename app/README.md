@@ -54,8 +54,9 @@ a private store only the Reminders app can read), so the bridge is a small
   in the app removes the reminder from the phone (the app keeps it as done);
   renames, date changes and un-ticking are delete + create. Reminders are
   matched by list + title, the only stable handle Shortcuts exposes.
-- Dated reminders show on that day in **Days**; undated ones on the **Week**
-  to-do list. The **Dinners** tab and the Dinner line on each day card use one
+- Dated reminders from every list show on that day in **Days**; undated ones
+  from one chosen list (default "Reminders", Settings → "To-do list from")
+  join the **Week** to-do list. The **Dinners** tab and the Dinner line on each day card use one
   list (default "Dinners", changeable in Settings).
 - It runs on a schedule you set in Shortcuts → Automation ("Run immediately"),
   and from **Sync now** in Settings, which opens the Shortcut and returns.

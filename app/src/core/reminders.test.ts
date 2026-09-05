@@ -34,6 +34,8 @@ describe('reminder selectors', () => {
 
   it('lists undated reminders, hiding ones completed before today', () => {
     expect(undatedReminders(d, { excludeList: 'Dinners', today: '2026-03-19' }).map((r) => r.title)).toEqual(['Vaccines', 'Done today']);
+    expect(undatedReminders(d, { onlyList: 'reminders', today: '2026-03-19' }).map((r) => r.title)).toEqual(['Vaccines', 'Done today']);
+    expect(undatedReminders(d, { onlyList: 'Dinners', today: '2026-03-19' }).map((r) => r.title)).toEqual(['Pasta idea']);
   });
 
   it('lays the dinners list over a week', () => {
