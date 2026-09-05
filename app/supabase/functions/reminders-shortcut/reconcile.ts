@@ -37,8 +37,12 @@ export interface ReconcileResult {
   tombstoned: number;
 }
 
-/** A row the app pushed to the phone waits this long for the phone to confirm. */
-const GRACE_MS = 24 * 3600 * 1000;
+/**
+ * A change handed to the phone is applied in the same run, so the very next
+ * snapshot should show it. Wait this long before assuming the phone failed and
+ * sending it again (or, for an untouched row, treating its absence as done).
+ */
+const GRACE_MS = 10 * 60 * 1000;
 
 const SEP = '';
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
