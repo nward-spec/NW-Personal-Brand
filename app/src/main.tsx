@@ -6,7 +6,8 @@ import './styles.css';
 
 // Service worker: pre-caches the app shell so it opens offline and updates
 // itself in the background on the next launch.
-registerSW({ immediate: true });
+// VITE_NO_SW=1 builds a single-page bundle for hosts that cannot serve a service worker.
+if (!import.meta.env.VITE_NO_SW) registerSW({ immediate: true });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
