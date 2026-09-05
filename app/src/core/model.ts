@@ -355,6 +355,7 @@ export function normaliseReminder(r: ReminderRow): ReminderRow {
     completedAt: r.completedAt ?? null,
     deleted: !!r.deleted,
     pending: r.pending ?? null,
+    dispatchedAt: r.dispatchedAt ?? null,
     updatedAt: r.updatedAt,
   };
 }

@@ -5,7 +5,7 @@ import type { GoalTemplate, HabitTemplate } from '../core/types';
 import { newId } from '../core/types';
 import { store, updateWeek, useAppData } from '../web/app-store';
 import { cloud, useCloud } from '../web/cloud';
-import { reminders, useReminders } from '../web/reminders';
+import { SHORTCUT_NAME, reminders, shortcutEndpoint, useReminders } from '../web/reminders';
 import { daysLabel } from './Chips';
 import { GoalSheet, HabitSheet } from './EditorSheets';
 
@@ -146,11 +146,10 @@ function AccountCard() {
 function RemindersCard() {
   const c = useCloud();
   const r = useReminders();
-  const [appleId, setAppleId] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showSteps, setShowSteps] = useState(false);
 
   const run = async (fn: () => Promise<string | void>) => {
     setBusy(true);
@@ -166,61 +165,50 @@ function RemindersCard() {
     }
   };
 
+  const copy = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage(`${label} copied.`);
+    } catch {
+      setError(`Could not copy. Long-press the ${label.toLowerCase()} to select it.`);
+    }
+  };
+
   const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'never');
 
   return (
     <section className="card">
       <div className="card-head">
         <h3 className="card-title">Apple Reminders</h3>
-        {r.account && <span className="hint">{r.syncing ? 'Syncing…' : `Synced ${fmt(r.account.lastSyncAt)}`}</span>}
+        {r.account && <span className="hint">Last run {fmt(r.account.lastSyncAt)}</span>}
       </div>
       {!c.configured && <p className="note">Needs cloud sync, which is not configured in this build.</p>}
-      {c.configured && !c.user && <p className="note">Sign in above first. Reminders sync runs on the server, so it needs your account.</p>}
+      {c.configured && !c.user && <p className="note">Sign in above first. The sync is tied to your account.</p>}
       {c.configured && c.user && !r.account && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(async () => {
-              const res = await reminders.connect(appleId, password);
-              setPassword('');
-              return res ? `Connected. Found ${res.lists.length} list${res.lists.length === 1 ? '' : 's'}: ${res.lists.join(', ')}.` : 'Connected.';
-            });
-          }}
-        >
+        <>
           <p className="note">
-            Reminders with a due date appear on that day, undated ones on the to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders too.
+            Reminders sync through a small Shortcut on your iPhone. Reminders with a due date appear on that day, undated ones on the to-do list, and your dinners list becomes the Dinners tab. Ticking, renaming, moving or deleting here changes them in Apple Reminders when the Shortcut next runs.
           </p>
-          <p className="note">
-            Use an <b>app-specific password</b>, not your Apple ID password: at account.apple.com → Sign-In and Security → App-Specific Passwords. It is stored encrypted on the server and never on this device.
-          </p>
-          <div className="field">
-            <label htmlFor="apple-id">Apple ID (email)</label>
-            <input id="apple-id" type="email" inputMode="email" autoComplete="username" value={appleId} onChange={(e) => setAppleId(e.target.value)} required />
-          </div>
-          <div className="field">
-            <label htmlFor="apple-pass">App-specific password</label>
-            <input id="apple-pass" type="password" autoComplete="off" placeholder="xxxx-xxxx-xxxx-xxxx" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
           {error && <p className="error">{error}</p>}
-          {message && <p className="ok">{message}</p>}
-          <button type="submit" className="btn primary" disabled={busy || r.syncing || !appleId || !password}>
-            {busy || r.syncing ? 'Connecting…' : 'Connect'}
+          <button type="button" className="btn primary" disabled={busy} onClick={() => run(async () => (await reminders.connect(), setShowSteps(true), 'Ready. Follow the steps below to build the Shortcut.'))}>
+            Set up Reminders sync
           </button>
-        </form>
+        </>
       )}
       {c.configured && c.user && r.account && (
         <>
           <div className="kv">
-            <span className="k">Apple ID</span>
-            <span>{r.account.appleId}</span>
-          </div>
-          <div className="kv">
-            <span className="k">Lists</span>
-            <span>{r.account.lists.length ? r.account.lists.join(', ') : '—'}</span>
+            <span className="k">Lists seen</span>
+            <span>{r.account.lists.length ? r.account.lists.join(', ') : 'none yet — run the Shortcut'}</span>
           </div>
           <div className="kv">
             <span className="k">Dinners list</span>
-            <select value={r.account.dinnersList} onChange={(e) => run(() => reminders.setDinnersList(e.target.value))} aria-label="Dinners list" style={{ font: 'inherit', padding: '6px 8px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'inherit' }}>
+            <select
+              value={r.account.dinnersList}
+              onChange={(e) => run(() => reminders.setDinnersList(e.target.value))}
+              aria-label="Dinners list"
+              style={{ font: 'inherit', padding: '6px 8px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'inherit' }}
+            >
               {[r.account.dinnersList, ...r.account.lists.filter((l) => l !== r.account?.dinnersList)].map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -228,32 +216,83 @@ function RemindersCard() {
               ))}
             </select>
           </div>
-          {r.last && (
-            <div className="kv">
-              <span className="k">Last sync</span>
-              <span>
-                {r.last.pulled} pulled · {r.last.pushed} pushed
-              </span>
-            </div>
-          )}
           {(r.error || r.account.lastError) && <p className="error">{r.error ?? r.account.lastError}</p>}
           {error && <p className="error">{error}</p>}
           {message && <p className="ok">{message}</p>}
           <div className="btnrow">
-            <button type="button" className="btn" disabled={busy || r.syncing} onClick={() => run(async () => (await reminders.syncNow(), 'Synced.'))}>
-              {r.syncing ? 'Syncing…' : 'Sync now'}
+            <button type="button" className="btn primary" disabled={busy || r.syncing} onClick={() => run(() => reminders.runShortcut())}>
+              {r.syncing ? 'Opening Shortcuts…' : 'Sync now'}
+            </button>
+            <button type="button" className="btn" disabled={busy} onClick={() => run(async () => (await reminders.pull(), 'Refreshed.'))}>
+              Refresh
+            </button>
+          </div>
+          <div className="btnrow">
+            <button type="button" className="btn ghost" onClick={() => setShowSteps((v) => !v)}>
+              {showSteps ? 'Hide setup steps' : 'Show setup steps'}
             </button>
             <button
               type="button"
               className="btn ghost danger"
-              disabled={busy || r.syncing}
+              disabled={busy}
               onClick={() => {
-                if (window.confirm('Disconnect Apple Reminders? Reminders disappear from the app; nothing is deleted in Apple Reminders.')) void run(() => reminders.disconnect());
+                if (window.confirm('Disconnect Apple Reminders? Reminders disappear from the app; nothing is deleted on your phone.')) void run(() => reminders.disconnect());
               }}
             >
               Disconnect
             </button>
           </div>
+          {showSteps && (
+            <div className="section">
+              <p className="note">
+                Build this once in the <b>Shortcuts</b> app on your iPhone. Name it exactly <b>{SHORTCUT_NAME}</b>. Then add an Automation (Time of Day, e.g. 7 am, 1 pm and 8 pm, "Run immediately") that runs it, and use <b>Sync now</b> above whenever you want it right away.
+              </p>
+              <div className="field">
+                <label>Your sync link (step 5)</label>
+                <input readOnly value={shortcutEndpoint()} onFocus={(e) => e.currentTarget.select()} />
+                <button type="button" className="btn sm" onClick={() => copy('Link', shortcutEndpoint())}>
+                  Copy link
+                </button>
+              </div>
+              <div className="field">
+                <label>Your token (step 5, after "Bearer ")</label>
+                <input readOnly value={r.account.token} onFocus={(e) => e.currentTarget.select()} />
+                <button type="button" className="btn sm" onClick={() => copy('Token', r.account!.token)}>
+                  Copy token
+                </button>
+              </div>
+              <ol className="steps">
+                <li>
+                  <b>Find Reminders</b>. Turn on Sort by → <i>Creation Date</i>, Order → <i>Latest First</i>, Limit → 400. No other filters.
+                </li>
+                <li>
+                  <b>Repeat with each</b> item in Reminders. Inside it, add a <b>Text</b> action containing, on one line: <i>Repeat Item</i> (Title) <code> | </code> <i>Repeat Item</i> (List) <code> | </code> <i>Repeat Item</i> (Due Date) <code> | </code> <i>Repeat Item</i> (Is Completed). Tap each inserted Repeat Item variable to pick the property in brackets. Separate them with space, vertical bar, space.
+                </li>
+                <li>
+                  After the repeat: <b>Combine Text</b> → Repeat Results, with <i>New Lines</i>.
+                </li>
+                <li>
+                  <b>Get Contents of URL</b>: URL = the sync link above. Method <i>POST</i>. Headers: <i>Authorization</i> = <code>Bearer </code> followed by your token. Request Body → <i>File</i> → the Combined Text.
+                </li>
+                <li>
+                  <b>Split Text</b> the Contents of URL by <i>New Lines</i>, then <b>Repeat with each</b> item in that.
+                </li>
+                <li>
+                  Inside: <b>Split Text</b> the Repeat Item by <i>Custom</i> = space, vertical bar, space. Then four <b>Get Item from List</b> actions: item 1 → call it Op, 2 → List, 3 → Title, 4 → Due (set each as a variable with <b>Set Variable</b>).
+                </li>
+                <li>
+                  <b>If</b> Op <i>is</i> <code>complete</code>: <b>Find Reminders</b> where Title <i>is</i> Title and List <i>is</i> List → <b>Edit Reminder</b>: Set <i>Is Completed</i> of Reminders to <i>Yes</i>. End If.
+                </li>
+                <li>
+                  <b>If</b> Op <i>is</i> <code>create</code>: <b>Add New Reminder</b> with Title, in list List, Due Date → Due (turn on the date option and pick the Due variable). End If.
+                </li>
+                <li>
+                  <b>If</b> Op <i>is</i> <code>delete</code>: <b>Find Reminders</b> where Title <i>is</i> Title and List <i>is</i> List → <b>Remove Reminders</b>. End If.
+                </li>
+              </ol>
+              <p className="note">Run it once from the Shortcuts app to grant Reminders access, then come back here and tap Refresh: your lists appear above and reminders show on their days.</p>
+            </div>
+          )}
         </>
       )}
     </section>

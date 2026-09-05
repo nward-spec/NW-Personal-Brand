@@ -785,3 +785,23 @@ h2.section-title {
   white-space: normal;
   text-align: left;
 }
+
+/* ---- Setup steps ---- */
+ol.steps {
+  padding-left: 20px;
+  margin: 8px 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+ol.steps li {
+  margin-bottom: 8px;
+}
+ol.steps code {
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.field .btn.sm {
+  align-self: flex-start;
+}

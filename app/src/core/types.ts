@@ -88,8 +88,10 @@ export interface ReminderRow {
   completedAt?: string | null;
   /** True once the reminder is gone from iCloud (kept as a tombstone). */
   deleted: boolean;
-  /** Change waiting to be pushed to iCloud. */
+  /** Change waiting to be pushed to Apple Reminders. */
   pending: 'create' | 'update' | 'delete' | null;
+  /** Set by the server when a change was handed to the phone and awaits confirmation. */
+  dispatchedAt?: string | null;
   updatedAt: string;
 }
 

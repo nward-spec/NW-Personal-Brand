@@ -38,32 +38,27 @@ import a JSON file.
 
 ## Apple Reminders (two-way) and the Dinners tab
 
-Reminders are mirrored through iCloud's CalDAV interface by the
-`reminders-sync` edge function, the only component that talks to Apple.
+Apple removed CalDAV access to Reminders in iOS 13 (upgraded reminders live in
+a private store only the Reminders app can read), so the bridge is a small
+**iPhone Shortcut** rather than a server-side connection.
 
-- Reminders with a due date show on that day in **Days**; undated ones show on
-  the **Week** to-do list. Ticking, renaming, moving to another day, or
-  deleting in the app changes the reminder in Apple Reminders.
-- The **Dinners** tab is one Reminders list (default "Dinners", changeable in
-  Settings): a reminder due on a night is that night's dinner, undated ones are
-  ideas. Planning a dinner creates or re-dates a reminder in that list.
-- Connect in Settings → Apple Reminders with your Apple ID and an
-  **app-specific password** (account.apple.com → Sign-In and Security →
-  App-Specific Passwords). The password is AES-encrypted with the function's
-  `ICLOUD_KEY` secret before it is stored; the app never receives it back.
-- Sync runs when the app opens or returns to the foreground, a couple of
-  seconds after any reminder edit, and from "Sync now". Each run reads all
-  reminder lists, pushes pending edits (with `If-Match` ETags), then rewrites
-  changed rows. Completed reminders older than 60 days are left alone.
+- Settings → Apple Reminders → "Set up Reminders sync" creates a per-user
+  token and shows the steps to build the Shortcut (named `Journal Sync`).
+- The Shortcut posts a snapshot of the reminders (title, list, due date,
+  completed) to the `reminders-shortcut` edge function and receives commands
+  back: `complete`, `create`, `delete`. Renames, date changes and un-ticking
+  are sent as delete + create. Reminders are matched by list + title, the only
+  stable handle Shortcuts exposes.
+- Dated reminders show on that day in **Days**; undated ones on the **Week**
+  to-do list. The **Dinners** tab and the Dinner line on each day card use one
+  list (default "Dinners", changeable in Settings).
+- It runs on a schedule you set in Shortcuts → Automation ("Run immediately"),
+  and from **Sync now** in Settings, which opens the Shortcut and returns.
 
-Files: `supabase/functions/reminders-sync/` (`ics.ts` VTODO parsing/patching,
-`caldav.ts` client, `sync.ts` orchestrator, `crypto.ts`, `index.ts` entry);
-tests run with the rest of `npm test`.
-
-Caveat: Apple documents no third-party API for Reminders. CalDAV access to
-reminders has worked for years but is not guaranteed by Apple; if iCloud stops
-exposing lists over CalDAV, the "Connect" step reports it and the fallback is
-an iPhone Shortcut that talks to the same tables.
+Files: `supabase/functions/reminders-shortcut/` (`reconcile.ts` and tests,
+`index.ts` entry). The earlier CalDAV implementation in
+`supabase/functions/reminders-sync/` is kept for accounts that still expose
+reminders that way, but Apple accounts on the current Reminders format do not.
 
 ## Cloud sync (Supabase)
 

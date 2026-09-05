@@ -90,11 +90,11 @@ async function main() {
 
   // 6. Edge function (Supabase CLI bundles and uploads via the API)
   log('Deploying reminders-sync function…');
-  execSync(`npx --yes supabase@latest functions deploy reminders-sync --project-ref ${ref} --use-api --no-verify-jwt=false`, {
-    cwd: root,
-    stdio: 'inherit',
-    env: { ...process.env, SUPABASE_ACCESS_TOKEN: token },
-  });
+  const cli = { cwd: root, stdio: 'inherit', env: { ...process.env, SUPABASE_ACCESS_TOKEN: token } };
+  execSync(`npx --yes supabase@latest functions deploy reminders-sync --project-ref ${ref} --use-api`, cli);
+  // The Shortcut authenticates with its own token, not a Supabase JWT.
+  log('Deploying reminders-shortcut function…');
+  execSync(`npx --yes supabase@latest functions deploy reminders-shortcut --project-ref ${ref} --use-api --no-verify-jwt`, cli);
 
   // 7. Auth: instant sign-up, redirect URLs
   const siteUrl = process.env.SITE_URL;
