@@ -19,3 +19,10 @@ that keep all three projects uniform across devices.
 ## Structure
 
 - `project/` — working files for this project.
+
+## Weekly Journal app
+
+`app/` contains the Weekly Journal, a mobile-first PWA that replaces the paper
+weekly planner (priorities, to-dos, weekly goals, habit grid, day plan with
+outfits, optional cloud sync). See [`app/README.md`](./app/README.md) for
+running, deploying, and Supabase setup.

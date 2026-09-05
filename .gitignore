@@ -13,3 +13,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# App build output
+app/dist/
+app/dev-dist/
