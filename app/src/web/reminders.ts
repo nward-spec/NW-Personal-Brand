@@ -128,17 +128,17 @@ export const reminders = {
 
   /**
    * Push the app's edits to the database, then hand over to the Shortcut.
-   * On an iPhone this opens the Shortcuts app; it returns here when done, and
-   * the foreground handler pulls the rewritten rows.
+   * On an iPhone this opens the Shortcuts app; come back to the app afterwards
+   * and the foreground handler pulls the rewritten rows.
    */
   async runShortcut() {
     set({ syncing: true, error: null });
     try {
       await cloud.syncNow();
       if (!isApplePhone()) throw new Error('The Shortcut runs on your iPhone or iPad. Open the app there and tap Sync.');
-      const back = window.location.href.split('#')[0];
-      const url = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}&x-success=${encodeURIComponent(back)}&x-cancel=${encodeURIComponent(back)}&x-error=${encodeURIComponent(back)}`;
-      window.location.href = url;
+      // Plain run-shortcut, no x-callback: a callback URL would reopen the site in
+      // Safari, which is a different sign-in from the installed app.
+      window.location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}`;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
