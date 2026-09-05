@@ -34,7 +34,7 @@ export function SettingsScreen({ weekStart }: { weekStart: string }) {
           <h3 className="card-title">About</h3>
         </div>
         <p className="note">
-          Weekly Journal v{__APP_VERSION__}. To install: open this page in Safari (iPhone) or Chrome (Android), then choose <b>Add to Home Screen</b>. It works offline once installed.
+          Weekly Journal v{__APP_VERSION__}, built {new Date(__BUILD_TIME__).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}. If a change you were told about is missing, close the app fully and reopen it. To install: open this page in Safari (iPhone) or Chrome (Android), then choose <b>Add to Home Screen</b>. It works offline once installed.
         </p>
       </section>
     </>

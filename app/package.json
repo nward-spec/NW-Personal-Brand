@@ -1,7 +1,7 @@
 {
   "name": "weekly-journal",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Mobile-first weekly planner: priorities, to-dos, goals, habits and a Monday-to-Sunday day plan, with optional cloud sync.",
   "scripts": {
