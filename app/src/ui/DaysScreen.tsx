@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { addDayItem, deleteDayItem, editDayItem, moveDayItem, sendDayItemToTodos, setOutfit, toggleDayItem } from '../core/model';
 import { DAY_KEYS, DAY_LABELS, type DayKey, dayKeyOf, formatDayHeading, todayISO, weekDates } from '../core/week';
 import { store, updateWeek, useAppData, useWeek } from '../web/app-store';
-import { DEFAULT_DINNERS_LIST, deleteReminder, remindersForDay, renameReminder, setReminderDue, toggleReminder } from '../core/reminders';
+import { DEFAULT_DINNERS_LIST, deleteReminder, dinnersForWeek, remindersForDay, renameReminder, setReminderDue, toggleReminder } from '../core/reminders';
+import { useCloud } from '../web/cloud';
+import { DinnerLine, DinnerSheets, type DinnerSheet } from './DinnerSheets';
 import { useReminders } from '../web/reminders';
 import { DayPick } from './Chips';
 import { ItemSheet } from './EditorSheets';
@@ -12,13 +14,17 @@ export function DaysScreen({ weekStart }: { weekStart: string }) {
   const week = useWeek(weekStart);
   const data = useAppData();
   const { account } = useReminders();
+  const cloudState = useCloud();
+  const dinnersList = account?.dinnersList ?? DEFAULT_DINNERS_LIST;
   const [sheet, setSheet] = useState<{ day: DayKey; id: string } | null>(null);
   const [rsheet, setRsheet] = useState<string | null>(null);
+  const [dsheet, setDsheet] = useState<DinnerSheet>(null);
   const edit = (fn: Parameters<typeof updateWeek>[1]) => updateWeek(weekStart, fn);
   const dates = weekDates(weekStart);
   const today = todayISO();
   const todayKey = dates.includes(today) ? dayKeyOf(today) : null;
   const todayRef = useRef<HTMLElement>(null);
+  const dinners = dinnersForWeek(data, weekStart, dinnersList);
 
   // Bring today into view when opening the current week.
   useEffect(() => {
@@ -33,7 +39,7 @@ export function DaysScreen({ weekStart }: { weekStart: string }) {
       {DAY_KEYS.map((day, i) => {
         const d = week.days[day];
         const isToday = day === todayKey;
-        const rems = remindersForDay(data, dates[i], { excludeList: account?.dinnersList ?? DEFAULT_DINNERS_LIST });
+        const rems = remindersForDay(data, dates[i], { excludeList: dinnersList });
         const done = d.items.filter((x) => x.done).length + rems.filter((r) => r.completed).length;
         const total = d.items.length + rems.length;
         return (
@@ -50,9 +56,10 @@ export function DaysScreen({ weekStart }: { weekStart: string }) {
               )}
             </div>
             <div className="outfit">
-              <span className="label">Wear</span>
+              <span className="label">OOTD</span>
               <input value={d.outfit} placeholder="e.g. green dress, sneakers" onChange={(e) => edit((w) => setOutfit(w, day, e.target.value))} aria-label={`Outfit for ${DAY_LABELS[day]}`} autoComplete="off" />
             </div>
+            <DinnerLine meals={dinners.days[day]} dayLabel={DAY_LABELS[day]} onPlan={() => setDsheet({ kind: 'add', date: dates[i] })} onEdit={(uid) => setDsheet({ kind: 'edit', uid })} showPending={cloudState.configured} />
             <ul className="rows">
               {d.items.map((it) => (
                 <CheckRow
@@ -140,6 +147,8 @@ export function DaysScreen({ weekStart }: { weekStart: string }) {
           </div>
         )}
       </ItemSheet>
+
+      <DinnerSheets sheet={dsheet} onClose={() => setDsheet(null)} list={dinnersList} week={dinners} dates={dates} />
     </>
   );
 }

@@ -1,15 +1,10 @@
 import { useState } from 'react';
-import { DEFAULT_DINNERS_LIST, createReminder, deleteReminder, dinnersForWeek, renameReminder, setReminderDue, toggleReminder } from '../core/reminders';
-import type { ReminderRow } from '../core/types';
-import { DAY_KEYS, DAY_LABELS, DAY_SHORT, dayKeyOf, parseISODate, todayISO, weekDates } from '../core/week';
+import { DEFAULT_DINNERS_LIST, createReminder, dinnersForWeek } from '../core/reminders';
+import { DAY_KEYS, DAY_LABELS, DAY_SHORT, parseISODate, todayISO, weekDates } from '../core/week';
 import { store, useAppData } from '../web/app-store';
 import { useCloud } from '../web/cloud';
 import { useReminders } from '../web/reminders';
-import { DayPick } from './Chips';
-import { ItemSheet } from './EditorSheets';
-import { Sheet } from './Sheet';
-
-type SheetState = { kind: 'edit'; uid: string } | { kind: 'add'; date: string } | { kind: 'idea'; uid: string } | null;
+import { DinnerSheets, type DinnerSheet } from './DinnerSheets';
 
 /** What's for dinner, Monday to Sunday, straight from the dinners list in Apple Reminders. */
 export function DinnersScreen({ weekStart }: { weekStart: string }) {
@@ -20,16 +15,8 @@ export function DinnersScreen({ weekStart }: { weekStart: string }) {
   const week = dinnersForWeek(data, weekStart, list);
   const dates = weekDates(weekStart);
   const today = todayISO();
-  const [sheet, setSheet] = useState<SheetState>(null);
+  const [sheet, setSheet] = useState<DinnerSheet>(null);
   const [draft, setDraft] = useState('');
-  const close = () => setSheet(null);
-
-  const editing: ReminderRow | undefined = sheet?.kind === 'edit' || sheet?.kind === 'idea' ? data.reminders[sheet.uid] : undefined;
-
-  const add = (date: string | null, title: string) => {
-    if (!title.trim()) return;
-    store.setReminder(createReminder({ list, title, due: date }));
-  };
 
   return (
     <>
@@ -68,7 +55,11 @@ export function DinnersScreen({ weekStart }: { weekStart: string }) {
                       {meals.map((m) => (
                         <button key={m.uid} type="button" className={m.completed ? 'done' : undefined} style={{ textAlign: 'left' }} onClick={() => setSheet({ kind: 'edit', uid: m.uid })}>
                           {m.title}
-                          {m.pending && c.configured && <span className="tag pending" style={{ marginLeft: 6 }}>syncing</span>}
+                          {m.pending && c.configured && (
+                            <span className="tag pending" style={{ marginLeft: 6 }}>
+                              syncing
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -95,7 +86,7 @@ export function DinnersScreen({ weekStart }: { weekStart: string }) {
         {week.ideas.length === 0 && <div className="empty">Add meal ideas here; give one a day when you plan the week.</div>}
         <div className="daychips" style={{ marginBottom: 8 }}>
           {week.ideas.map((m) => (
-            <button key={m.uid} type="button" className="chip" onClick={() => setSheet({ kind: 'idea', uid: m.uid })}>
+            <button key={m.uid} type="button" className="chip" onClick={() => setSheet({ kind: 'edit', uid: m.uid })}>
               {m.title}
             </button>
           ))}
@@ -104,7 +95,7 @@ export function DinnersScreen({ weekStart }: { weekStart: string }) {
           className="addrow"
           onSubmit={(e) => {
             e.preventDefault();
-            add(null, draft);
+            if (draft.trim()) store.setReminder(createReminder({ list, title: draft, due: null }));
             setDraft('');
           }}
         >
@@ -120,77 +111,7 @@ export function DinnersScreen({ weekStart }: { weekStart: string }) {
         </form>
       </section>
 
-      {/* Plan a dinner for a specific night */}
-      <Sheet open={sheet?.kind === 'add'} title={sheet?.kind === 'add' ? `Dinner · ${DAY_LABELS[dayKeyOf(sheet.date)]}` : ''} onClose={close}>
-        {sheet?.kind === 'add' && <AddDinner ideas={week.ideas} onPick={(idea) => (store.updateReminder(idea.uid, (x) => setReminderDue(x, sheet.date)), close())} onNew={(t) => (add(sheet.date, t), close())} />}
-      </Sheet>
-
-      {/* Edit a planned dinner or an idea */}
-      <ItemSheet
-        open={!!editing}
-        title={editing ? (editing.due ? `Dinner · ${DAY_LABELS[dayKeyOf(editing.due)]}` : 'Meal idea') : ''}
-        text={editing?.title ?? ''}
-        onClose={close}
-        onSave={(text) => editing && store.updateReminder(editing.uid, (x) => renameReminder(x, text))}
-        onDelete={() => editing && store.updateReminder(editing.uid, deleteReminder)}
-      >
-        {editing && (
-          <div className="section">
-            <div className="card-title">{editing.due ? 'Move to' : 'Plan for'}</div>
-            <DayPick
-              exclude={editing.due ? dayKeyOf(editing.due) : undefined}
-              onPick={(to) => {
-                store.updateReminder(editing.uid, (x) => setReminderDue(x, dates[DAY_KEYS.indexOf(to)]));
-                close();
-              }}
-            />
-            <div className="btnrow">
-              {editing.due && (
-                <button type="button" className="btn ghost" onClick={() => (store.updateReminder(editing.uid, (x) => setReminderDue(x, null)), close())}>
-                  Back to ideas
-                </button>
-              )}
-              <button type="button" className="btn ghost" onClick={() => (store.updateReminder(editing.uid, toggleReminder), close())}>
-                {editing.completed ? 'Mark not cooked' : 'Mark cooked'}
-              </button>
-            </div>
-          </div>
-        )}
-      </ItemSheet>
-    </>
-  );
-}
-
-function AddDinner({ ideas, onPick, onNew }: { ideas: ReminderRow[]; onPick: (idea: ReminderRow) => void; onNew: (title: string) => void }) {
-  const [text, setText] = useState('');
-  return (
-    <>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) onNew(text.trim());
-        }}
-      >
-        <div className="field">
-          <label htmlFor="dinner-text">What's for dinner?</label>
-          <input id="dinner-text" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Tacos" autoComplete="off" autoFocus />
-        </div>
-        <button type="submit" className="btn primary" disabled={!text.trim()}>
-          Plan it
-        </button>
-      </form>
-      {ideas.length > 0 && (
-        <div className="section">
-          <div className="card-title">Or pick an idea</div>
-          <div className="daychips">
-            {ideas.map((m) => (
-              <button key={m.uid} type="button" className="chip" onClick={() => onPick(m)}>
-                {m.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <DinnerSheets sheet={sheet} onClose={() => setSheet(null)} list={list} week={week} dates={dates} />
     </>
   );
 }
