@@ -2,32 +2,29 @@
 //
 // Apple removed CalDAV access to Reminders in iOS 13, so the phone itself has
 // to be the bridge. The Shortcut sends a snapshot of the reminders it can see
-// (one per line: title, list, due date, completed), and receives back a short
-// list of commands to apply. Reminders are matched by list + title, the only
-// stable handle the Shortcuts app gives us, so the app's edits are expressed
-// as three operations the Shortcut knows how to run:
+// (one per line: title, list, due date, completed) and receives back commands
+// to apply. Commands refer to reminders by their line number in the snapshot
+// the Shortcut just sent, which is also the item's position in the Shortcut's
+// own "Find Reminders" result, so the Shortcut never has to search by name:
 //
-//   complete | list | title |        Edit Reminder → Is Completed = true
-//   create   | list | title | due    Add New Reminder
-//   delete   | list | title |        Find Reminders → Remove Reminders
+//   delete | <line number> | <title> |        Get Item from List → Remove Reminders
+//   create | <list> | <title> | <due>          Add New Reminder
 //
-// Renames, date changes and un-completing become delete + create.
+// Ticking a reminder in the app removes it from the phone (the app keeps it as
+// done); renames, date changes and un-ticking become delete + create.
 
 import type { ReminderRow } from '../reminders-sync/sync.ts';
 
 export interface PhoneReminder {
+  /** 1-based line number in the snapshot: the Shortcut's list index. */
+  index: number;
   list: string;
   title: string;
   due: string | null;
   completed: boolean;
 }
 
-export interface Command {
-  op: 'complete' | 'create' | 'delete';
-  list: string;
-  title: string;
-  due?: string | null;
-}
+export type Command = { op: 'delete'; index: number; title: string } | { op: 'create'; list: string; title: string; due: string | null };
 
 export interface ReconcileResult {
   /** Rows to write back (only those that changed). */
@@ -45,16 +42,24 @@ const SEP = '';
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
 export const keyOf = (list: string, title: string) => `${norm(list).toLowerCase()}${SEP}${norm(title).toLowerCase()}`;
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
 function parseDue(raw: string): string | null {
   const s = raw.trim();
   if (!s) return null;
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  // Shortcuts default formats such as "17 Mar 2026 at 9:00 am" or "3/17/26, 9:00 AM".
+  // Day-first locales (Australia, UK): "17/03/2026, 6:00 pm" or "17/3/26".
+  const dmy = /^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})/.exec(s);
+  if (dmy) {
+    const y = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    return `${y}-${pad2(Number(dmy[2]))}-${pad2(Number(dmy[1]))}`;
+  }
+  // "17 Mar 2026 at 6:00 pm", "Mar 17, 2026 at 6:00 PM".
   const t = Date.parse(s.replace(/\s+at\s+/i, ' '));
   if (!Number.isNaN(t)) {
     const d = new Date(t);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   }
   return null;
 }
@@ -63,22 +68,28 @@ function parseBool(raw: string): boolean {
   return /^(yes|true|1|completed|done)$/i.test(raw.trim());
 }
 
-/** Lines of "title<TAB>list<TAB>due<TAB>completed". Blank and malformed lines are skipped. */
+/**
+ * Lines of "title | list | due | completed" (a tab also works as separator).
+ * Every non-empty line counts towards the index, even a malformed one, so
+ * indices keep matching the Shortcut's list.
+ */
 export function parseSnapshot(text: string): PhoneReminder[] {
   const out: PhoneReminder[] = [];
+  let index = 0;
   for (const raw of text.split(/\r?\n/)) {
     if (!raw.trim()) continue;
+    index++;
     const parts = raw.includes('\t') ? raw.split('\t') : raw.split(' | ');
     if (parts.length < 2) continue;
     const [title, list, due = '', completed = ''] = parts;
     if (!title.trim() || !list.trim()) continue;
-    out.push({ title: norm(title), list: norm(list), due: parseDue(due), completed: parseBool(completed) });
+    out.push({ index, title: norm(title), list: norm(list), due: parseDue(due), completed: parseBool(completed) });
   }
   return out;
 }
 
 export function formatCommands(commands: Command[]): string {
-  return commands.map((c) => [c.op, c.list, c.title, c.due ?? ''].join(' | ')).join('\n');
+  return commands.map((c) => (c.op === 'delete' ? ['delete', String(c.index), c.title, ''] : ['create', c.list, c.title, c.due ?? '']).join(' | ')).join('\n');
 }
 
 interface RowWithDispatch extends ReminderRow {
@@ -98,24 +109,23 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
 
   const recentlyDispatched = (r: RowWithDispatch) => !!r.dispatchedAt && nowMs - Date.parse(r.dispatchedAt) < GRACE_MS;
   const create = (r: ReminderRow) => commands.push({ op: 'create', list: r.list, title: r.title, due: r.due });
+  const remove = (p: PhoneReminder) => commands.push({ op: 'delete', index: p.index, title: p.title });
 
   for (const row of opts.rows as RowWithDispatch[]) {
     if (row.deleted) continue;
     const oldKey = row.href ?? keyOf(row.list, row.title);
     const newKey = keyOf(row.list, row.title);
     const item = phone.get(oldKey);
-    const [oldList, oldTitle] = item ? [item.list, item.title] : [row.list, row.title];
 
     if (row.pending === 'delete') {
-      if (item) commands.push({ op: 'delete', list: oldList, title: oldTitle });
+      if (item) remove(item);
       consumed.add(oldKey);
       save.push({ ...row, deleted: true, pending: null, updatedAt: nowIso });
       continue;
     }
 
     if (row.pending === 'create') {
-      if (!phone.has(newKey)) create(row);
-      if (row.completed) commands.push({ op: 'complete', list: row.list, title: row.title });
+      if (!row.completed && !phone.has(newKey)) create(row);
       consumed.add(newKey);
       save.push({ ...row, pending: null, href: newKey, dispatchedAt: nowIso, updatedAt: nowIso });
       continue;
@@ -124,20 +134,18 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
     if (row.pending === 'update') {
       if (!item) {
         if (recentlyDispatched(row)) continue; // the phone has not caught up yet; keep waiting
-        // Edited here but gone from the phone: recreate it there.
-        create(row);
-        if (row.completed) commands.push({ op: 'complete', list: row.list, title: row.title });
+        if (!row.completed) create(row); // edited here but gone from the phone: put it back
         consumed.add(newKey);
         save.push({ ...row, pending: null, href: newKey, dispatchedAt: nowIso, updatedAt: nowIso });
         continue;
       }
       const moved = newKey !== oldKey || (item.due ?? null) !== (row.due ?? null);
-      if (moved || (item.completed && !row.completed)) {
-        commands.push({ op: 'delete', list: oldList, title: oldTitle });
+      if (row.completed) {
+        // Done in the app: take it off the phone; the app keeps it ticked.
+        remove(item);
+      } else if (moved || item.completed) {
+        remove(item);
         create(row);
-        if (row.completed) commands.push({ op: 'complete', list: row.list, title: row.title });
-      } else if (row.completed && !item.completed) {
-        commands.push({ op: 'complete', list: oldList, title: oldTitle });
       }
       consumed.add(oldKey);
       consumed.add(newKey);
@@ -147,7 +155,7 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
 
     // No pending edit: the phone is the truth, once its snapshot has caught up.
     if (!item) {
-      if (recentlyDispatched(row)) continue;
+      if (row.completed || recentlyDispatched(row)) continue; // done items live on in the app
       save.push({ ...row, deleted: true, pending: null, updatedAt: nowIso });
       continue;
     }
