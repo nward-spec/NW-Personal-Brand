@@ -260,6 +260,7 @@ function RemindersCard() {
           {(r.error || r.account.lastError) && <p className="error">{r.error ?? r.account.lastError}</p>}
           {error && <p className="error">{error}</p>}
           {message && <p className="ok">{message}</p>}
+          <p className="note">Sync now opens the Shortcuts app and runs Journal Sync. When it finishes, switch back here; the app refreshes on its own.</p>
           <div className="btnrow">
             <button type="button" className="btn primary" disabled={busy || r.syncing} onClick={() => run(() => reminders.runShortcut())}>
               {r.syncing ? 'Opening Shortcuts…' : 'Sync now'}
@@ -381,7 +382,7 @@ function GuideCard() {
             <pre className="cmd">cd ~/Downloads &amp;&amp; shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"</pre>
           </li>
           <li>
-            <b>Send it to your iPhone.</b> AirDrop <i>Journal Sync (signed).shortcut</i> from the Mac to your iPhone and tap <i>Add Shortcut</i>. (Do not rely on the Mac's own iCloud sync if the Mac is signed in to someone else's Apple ID.)
+            <b>Send it to your iPhone.</b> AirDrop <i>Journal Sync (signed).shortcut</i> from the Mac to your iPhone and tap <i>Add Shortcut</i>. Every person needs their own file: it contains that person's key, so a file made for someone else would sync your reminders into their account. (Do not rely on the Mac's own iCloud sync if the Mac is signed in to someone else's Apple ID.)
           </li>
           <li>
             <b>Allow it to run.</b> On the iPhone: Settings app → Shortcuts → Advanced → turn on <i>Allow Sharing Large Amounts of Data</i> and <i>Allow Deleting Without Confirmation</i>. Then open Shortcuts, run <b>Journal Sync</b> once and allow access to Reminders and to the journal's server (<i>Always Allow</i>).
