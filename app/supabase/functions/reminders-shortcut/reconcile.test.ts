@@ -94,6 +94,23 @@ describe('reconcile', () => {
     expect(r.tombstoned).toBe(0);
   });
 
+  it('re-dates a same-named reminder the phone already has, instead of silently linking', () => {
+    const rows = [row('Dinners', 'Gozleme', { uid: 'new', due: '2026-03-21', pending: 'create', href: undefined })];
+    const snap = parseSnapshot('Gozleme | Dinners |  | No');
+    const r = reconcile({ rows, snapshot: snap, now: NOW, newId });
+    expect(formatCommands(r.commands).split('\n')).toEqual(['delete | 1 | Gozleme | ', 'create | Dinners | Gozleme | 2026-03-21']);
+  });
+
+  it('folds an app-created duplicate into the row the phone already had', () => {
+    const rows = [row('Dinners', 'Gozleme'), row('Dinners', 'Gozleme', { uid: 'dup', due: '2026-03-21', pending: 'create', href: undefined })];
+    const snap = parseSnapshot('Gozleme | Dinners |  | No');
+    const r = reconcile({ rows, snapshot: snap, now: NOW, newId });
+    const saved = Object.fromEntries(r.save.map((s) => [s.uid, s]));
+    expect(saved['dup']).toMatchObject({ deleted: true });
+    expect(saved['Dinners-Gozleme']).toMatchObject({ due: '2026-03-21', pending: null, dispatchedAt: NOW.toISOString() });
+    expect(formatCommands(r.commands).split('\n')).toEqual(['delete | 1 | Gozleme | ', 'create | Dinners | Gozleme | 2026-03-21']);
+  });
+
   it('recreates an edited reminder the phone has lost', () => {
     const r = reconcile({ rows: [row('Reminders', 'Pack', { pending: 'update', due: '2026-03-22' })], snapshot: [], now: NOW, newId });
     expect(r.commands).toEqual([{ op: 'create', list: 'Reminders', title: 'Pack', due: '2026-03-22' }]);

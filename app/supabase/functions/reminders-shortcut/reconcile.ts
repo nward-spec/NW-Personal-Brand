@@ -117,7 +117,29 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
   const create = (r: ReminderRow) => commands.push({ op: 'create', list: r.list, title: r.title, due: r.due });
   const remove = (p: PhoneReminder) => commands.push({ op: 'delete', index: p.index, title: p.title });
 
-  for (const row of opts.rows as RowWithDispatch[]) {
+  // An app-created row whose list + title already belongs to another live row
+  // (the phone had it first) is folded into that row: its edits move across
+  // and the duplicate is dropped, so the journal never shows two of them.
+  const rows: RowWithDispatch[] = (opts.rows as RowWithDispatch[]).map((r) => ({ ...r }));
+  const liveByKey = new Map<string, RowWithDispatch>();
+  for (const r of rows) if (!r.deleted && r.pending !== 'create') liveByKey.set(r.href ?? keyOf(r.list, r.title), r);
+  for (const r of rows) {
+    if (r.deleted || r.pending !== 'create') continue;
+    const twin = liveByKey.get(keyOf(r.list, r.title));
+    if (!twin) continue;
+    if ((twin.due ?? null) !== (r.due ?? null) || twin.completed !== r.completed) {
+      twin.due = r.due;
+      twin.completed = r.completed;
+      twin.completedAt = r.completedAt ?? null;
+      twin.pending = 'update';
+    }
+    r.deleted = true;
+    r.pending = null;
+    r.updatedAt = nowIso;
+    save.push(r);
+  }
+
+  for (const row of rows) {
     if (row.deleted) continue;
     const oldKey = row.href ?? keyOf(row.list, row.title);
     const newKey = keyOf(row.list, row.title);
@@ -131,7 +153,16 @@ export function reconcile(opts: { rows: ReminderRow[]; snapshot: PhoneReminder[]
     }
 
     if (row.pending === 'create') {
-      if (!row.completed && !phone.has(newKey)) create(row);
+      const existing = phone.get(newKey);
+      if (row.completed) {
+        if (existing) remove(existing);
+      } else if (!existing) {
+        create(row);
+      } else if ((existing.due ?? null) !== (row.due ?? null)) {
+        // Same name already on the phone but with a different date: re-date it.
+        remove(existing);
+        create(row);
+      }
       consumed.add(newKey);
       save.push({ ...row, pending: null, href: newKey, dispatchedAt: nowIso, updatedAt: nowIso });
       continue;
