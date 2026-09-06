@@ -57,6 +57,11 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userId);
 
     console.log(`shortcut sync user=${userId} snapshot=${snapshot.length} pulled=${result.pulled} commands=${result.commands.length} tombstoned=${result.tombstoned}`);
+    if ((req.headers.get('X-Journal-Format') ?? '').toLowerCase() === 'json') {
+      // Newer Shortcuts read the reply as a dictionary: no text splitting on the phone.
+      const commands = result.commands.map((c) => (c.op === 'delete' ? { op: 'delete', index: String(c.index), list: '', title: c.title, due: '' } : { op: 'create', index: '', list: c.list, title: c.title, due: c.due ?? '' }));
+      return new Response(JSON.stringify({ commands, count: commands.length }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
     return text(formatCommands(result.commands));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
