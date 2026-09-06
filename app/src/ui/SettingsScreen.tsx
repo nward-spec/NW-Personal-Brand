@@ -6,6 +6,7 @@ import { newId } from '../core/types';
 import { store, updateWeek, useAppData } from '../web/app-store';
 import { cloud, useCloud } from '../web/cloud';
 import { SHORTCUT_NAME, reminders, shortcutEndpoint, useReminders } from '../web/reminders';
+import { summariseReport } from '../core/report';
 import { SHORTCUT_VERSION, buildJournalSyncPlist } from '../core/shortcut-plist';
 import { ACCENT_PRESETS, DEFAULT_ACCENT, loadAccent, saveAccent } from '../web/theme';
 import { daysLabel } from './Chips';
@@ -231,6 +232,12 @@ function RemindersCard() {
             <span className="k">Shortcut</span>
             <span>{r.account.shortcutVersion ? (r.account.shortcutVersion === SHORTCUT_VERSION ? `version ${SHORTCUT_VERSION}, up to date` : `version ${r.account.shortcutVersion}; version ${SHORTCUT_VERSION} is available`) : 'not run yet'}</span>
           </div>
+          {r.account.lastReport && (
+            <div className="kv">
+              <span className="k">Last run</span>
+              <span>{summariseReport(r.account.lastReport)}</span>
+            </div>
+          )}
           {r.account.shortcutVersion && r.account.shortcutVersion !== SHORTCUT_VERSION && (
             <p className="error">Your phone is running an older Journal Sync. Changes made here will not reach Apple Reminders until you install the current Shortcut file: delete the old one in the Shortcuts app first, then import the new one.</p>
           )}
