@@ -4,9 +4,9 @@
 //   1. Find Reminders that are not completed (newest 400 by creation date).
 //   2. For each, write one line "title | list | due | completed".
 //   3. POST the lines to the reminders-shortcut function with the sync token.
-//   4. For each command line in the reply:
-//        delete | <n> | title |      → nth reminder from step 1 → Remove Reminders
-//        create | list | title | due → Add New Reminder (with a due date when given)
+//   4. For each command in the JSON reply ({ commands: [{ op, index, list, title, due }] }):
+//        delete → nth reminder from step 1 → Remove Reminders
+//        create → Add New Reminder in the list (with a due date when given)
 //
 // iOS only imports signed shortcut files. Sign on a Mac with:
 //   shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"
@@ -86,7 +86,6 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
   const RESPONSE = uuid();
   const LINES = uuid();
   const LOOP2 = uuid();
-  const FIELDS = uuid();
   const OP = uuid();
   const IDX = uuid();
   const ARG2 = uuid();
@@ -166,6 +165,7 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
           WFDictionaryFieldValueItems: [
             { WFItemType: 0, WFKey: plain('Authorization'), WFValue: plain(`Bearer ${opts.token}`) },
             { WFItemType: 0, WFKey: plain('Content-Type'), WFValue: plain('text/plain; charset=utf-8') },
+            { WFItemType: 0, WFKey: plain('X-Journal-Format'), WFValue: plain('json') },
           ],
         },
         WFSerializationType: 'WFDictionaryFieldValue',
@@ -174,38 +174,36 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
       WFRequestVariable: attachment(output(COMBINED, 'Combined Text')),
     }),
 
-    // 3. Apply commands
-    action('text.split', { UUID: LINES, text: attachment(output(RESPONSE, 'Contents of URL')), WFTextSeparatorType: 'New Lines' }),
-    action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 0, WFInput: attachment(output(LINES, 'Split Text')) }),
-    action('text.split', { UUID: FIELDS, text: attachment(repeatItem()), WFTextSeparatorType: 'Custom', WFTextCustomSeparator: ' | ' }),
-    // Only the command word is read unconditionally: an empty reply (nothing to
-    // do) or an error message still loops once, and must not fail on "item 2".
-    item(FIELDS, 'Split Text', 1, OP),
+    // 3. Apply commands. The reply is JSON ({ commands: [{ op, index, list, title, due }] }),
+    //    which Get Contents of URL hands over as a dictionary.
+    action('getvalueforkey', { UUID: LINES, WFInput: attachment(output(RESPONSE, 'Contents of URL')), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'commands' }),
+    action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 0, WFInput: attachment(output(LINES, 'Dictionary Value')) }),
+    action('getvalueforkey', { UUID: OP, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'op' }),
 
-    // delete | n | title
-    ifStart(IF_DELETE, output(OP, 'Item from List'), IS, 'delete'),
-    item(FIELDS, 'Split Text', 2, IDX),
-    item(REM, 'Reminders', output(IDX, 'Item from List'), TARGET),
+    // delete: nth reminder of the snapshot → Remove Reminders
+    ifStart(IF_DELETE, output(OP, 'Dictionary Value'), IS, 'delete'),
+    action('getvalueforkey', { UUID: IDX, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'index' }),
+    item(REM, 'Reminders', output(IDX, 'Dictionary Value'), TARGET),
     action('removereminders', { WFInputReminders: attachment(output(TARGET, 'Item from List')) }),
     ifEnd(IF_DELETE),
 
-    // create | list | title | due
-    ifStart(IF_CREATE, output(OP, 'Item from List'), IS, 'create'),
-    item(FIELDS, 'Split Text', 2, ARG2),
-    item(FIELDS, 'Split Text', 3, ARG3),
-    item(FIELDS, 'Split Text', 4, ARG4),
-    ifStart(IF_DUE, output(ARG4, 'Item from List'), HAS_ANY_VALUE),
+    // create: Add New Reminder in the list, dated when a due date is given
+    ifStart(IF_CREATE, output(OP, 'Dictionary Value'), IS, 'create'),
+    action('getvalueforkey', { UUID: ARG2, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'list' }),
+    action('getvalueforkey', { UUID: ARG3, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'title' }),
+    action('getvalueforkey', { UUID: ARG4, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'due' }),
+    ifStart(IF_DUE, output(ARG4, 'Dictionary Value'), HAS_ANY_VALUE),
     action('addnewreminder', {
-      WFCalendarItemTitle: tokenText([output(ARG3, 'Item from List')]),
-      WFCalendarItemCalendar: attachment(output(ARG2, 'Item from List')),
+      WFCalendarItemTitle: tokenText([output(ARG3, 'Dictionary Value')]),
+      WFCalendarItemCalendar: attachment(output(ARG2, 'Dictionary Value')),
       WFCalendarItemAlert: true,
       WFAlertTrigger: 'At Time',
-      WFAlertCustomTime: tokenText([output(ARG4, 'Item from List'), ' 09:00']),
+      WFAlertCustomTime: tokenText([output(ARG4, 'Dictionary Value'), ' 09:00']),
     }),
     ifOtherwise(IF_DUE),
     action('addnewreminder', {
-      WFCalendarItemTitle: tokenText([output(ARG3, 'Item from List')]),
-      WFCalendarItemCalendar: attachment(output(ARG2, 'Item from List')),
+      WFCalendarItemTitle: tokenText([output(ARG3, 'Dictionary Value')]),
+      WFCalendarItemCalendar: attachment(output(ARG2, 'Dictionary Value')),
     }),
     ifEnd(IF_DUE),
     ifEnd(IF_CREATE),
