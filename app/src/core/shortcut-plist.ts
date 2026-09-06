@@ -4,15 +4,21 @@
 //   1. Find Reminders that are not completed (newest 400 by creation date).
 //   2. For each, write one line "title | list | due | completed".
 //   3. POST the lines to the reminders-shortcut function with the sync token.
-//   4. For each command in the JSON reply ({ commands: [{ op, index, list, title, due }] }):
-//        delete         → nth reminder from step 1 → Remove Reminders
-//        create         → Add New Reminder in the list, due on the given day
-//        create-undated → Add New Reminder in the list, no date
-//      Each applied command posts a small notification so a run is visible.
+//      The JSON reply has three lists:
+//        deletes: [{ index, title }]        → nth reminder from step 1 → Remove Reminders
+//        creates: [{ list, title, when }]   → Add New Reminder, alert at `when`
+//        undated: [{ list, title }]         → Add New Reminder with no date
+//   4. Loop over each list. Every applied change posts a one-line report back
+//      (…?ack=1) and shows a notification, so a run leaves a trail in Settings.
 //
-// Plist shapes worth knowing: the If action wants its input wrapped as
-// { Type: 'Variable', Variable: <attachment> }; a bare attachment imports fine
-// but never matches, so every branch is skipped without an error.
+// Every action shape here was checked against shortcuts exported by the
+// Shortcuts app itself. Things that matter:
+//   - No If actions: their input must be wrapped as { Type: Variable, Variable }
+//     and a value from JSON needs a text coercion before "is" matches. A loop
+//     over an empty list simply does nothing, so the server splits the work.
+//   - A number field holding one variable (Get Item from List's index) is a
+//     WFTextTokenAttachment, not a token string.
+//   - Remove Reminders takes the previous action's output; it has no parameters.
 //
 // iOS only imports signed shortcut files. Sign on a Mac with:
 //   shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"
@@ -72,11 +78,8 @@ interface Action {
 
 const action = (id: string, params: { [key: string]: PlistValue }): Action => ({ WFWorkflowActionIdentifier: `is.workflow.actions.${id}`, WFWorkflowActionParameters: params });
 
-/** WFCondition code used by the If action: "is". */
-const IS = 4;
-
 /** Sent as X-Journal-Shortcut so the app can tell which Shortcut a phone runs. Bump when the Shortcut changes. */
-export const SHORTCUT_VERSION = '3';
+export const SHORTCUT_VERSION = '4';
 
 export interface ShortcutOptions {
   endpoint: string;
@@ -88,49 +91,65 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
   const limit = opts.limit ?? 400;
   const REM = uuid(); // Find Reminders
   const LINE = uuid(); // Text per reminder
-  const LOOP1 = uuid(); // grouping for the first repeat
-  const LOOP1_END = uuid(); // its "Repeat Results"
+  const LOOP1 = uuid();
+  const LOOP1_END = uuid();
   const COMBINED = uuid();
   const RESPONSE = uuid();
-  const LINES = uuid();
-  const LOOP2 = uuid();
-  const OP = uuid();
+  const DELETES = uuid();
+  const CREATES = uuid();
+  const UNDATED = uuid();
+  const N_DELETES = uuid();
+  const N_CREATES = uuid();
+  const N_UNDATED = uuid();
+  const LOOP_D = uuid();
+  const LOOP_C = uuid();
+  const LOOP_U = uuid();
   const IDX = uuid();
-  const ARG2 = uuid();
-  const ARG3 = uuid();
-  const ARG4 = uuid();
-  const IF_DELETE = uuid();
   const TARGET = uuid();
-  const DELETED_TITLE = uuid();
-  const IF_CREATE = uuid();
-  const IF_UNDATED = uuid();
-  const ARG5 = uuid();
-  const ARG6 = uuid();
+  const D_TITLE = uuid();
+  const C_LIST = uuid();
+  const C_TITLE = uuid();
+  const C_WHEN = uuid();
+  const U_LIST = uuid();
+  const U_TITLE = uuid();
 
-  const item = (source: string, sourceName: string, index: number | Ref, id: string) =>
-    action('getitemfromlist', {
-      UUID: id,
-      WFInput: attachment(output(source, sourceName)),
-      WFItemSpecifier: 'Item At Index',
-      WFItemIndex: typeof index === 'number' ? index : tokenText([index]),
+  const headers = (contentType: string): PlistValue => ({
+    Value: {
+      WFDictionaryFieldValueItems: [
+        { WFItemType: 0, WFKey: plain('Authorization'), WFValue: plain(`Bearer ${opts.token}`) },
+        { WFItemType: 0, WFKey: plain('Content-Type'), WFValue: plain(contentType) },
+        { WFItemType: 0, WFKey: plain('X-Journal-Format'), WFValue: plain('json') },
+        { WFItemType: 0, WFKey: plain('X-Journal-Shortcut'), WFValue: plain(SHORTCUT_VERSION) },
+      ],
+    },
+    WFSerializationType: 'WFDictionaryFieldValue',
+  });
+  const post = (url: string, body: Ref, id?: string) =>
+    action('downloadurl', {
+      ...(id ? { UUID: id } : {}),
+      WFURL: url,
+      WFHTTPMethod: 'POST',
+      ShowHeaders: true,
+      WFHTTPHeaders: headers('text/plain; charset=utf-8'),
+      WFHTTPBodyType: 'File',
+      WFRequestVariable: attachment(body),
     });
-
-  const ifStart = (group: string, input: Ref, condition: number, value: string) =>
-    action('conditional', {
-      GroupingIdentifier: group,
-      WFControlFlowMode: 0,
-      WFInput: { Type: 'Variable', Variable: attachment(input) },
-      WFCondition: condition,
-      WFConditionalActionString: value,
-    });
-  const ifEnd = (group: string, id?: string) => action('conditional', { GroupingIdentifier: group, WFControlFlowMode: 2, ...(id ? { UUID: id } : {}) });
+  /** Text → POST …?ack=1, so the server (and Settings) can show what the run did. */
+  const report = (parts: (string | Ref)[]) => {
+    const id = uuid();
+    return [action('gettext', { UUID: id, WFTextActionText: tokenText(parts) }), post(`${opts.endpoint}?ack=1`, output(id, 'Text'))];
+  };
+  const field = (id: string, key: string) => action('getvalueforkey', { UUID: id, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: key });
+  const listOf = (id: string, key: string) => action('getvalueforkey', { UUID: id, WFInput: attachment(output(RESPONSE, 'Contents of URL')), WFGetDictionaryValueType: 'Value', WFDictionaryKey: key });
+  const count = (id: string, source: string, name: string) => action('count', { UUID: id, WFCountType: 'Items', Input: attachment(output(source, name)) });
+  const loop = (group: string, source: string, name: string) => action('repeat.each', { GroupingIdentifier: group, WFControlFlowMode: 0, WFInput: attachment(output(source, name)) });
+  const loopEnd = (group: string) => action('repeat.each', { GroupingIdentifier: group, WFControlFlowMode: 2 });
   const notify = (parts: (string | Ref)[]) =>
     action('notification', { WFNotificationActionTitle: 'Journal Sync', WFNotificationActionBody: tokenText(parts), WFNotificationActionSound: false });
-  const field = (id: string, key: string) => action('getvalueforkey', { UUID: id, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: key });
 
   return [
     action('comment', {
-      WFCommentActionText: 'Journal Sync — generated by Weekly Journal. Keep the name "Journal Sync". Sends your reminders to the journal and applies its changes.',
+      WFCommentActionText: `Journal Sync v${SHORTCUT_VERSION} — generated by Weekly Journal. Keep the name "Journal Sync". Sends your reminders to the journal and applies its changes.`,
     }),
 
     // 1. Snapshot
@@ -141,7 +160,7 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
       WFContentItemFilter: {
         Value: {
           WFActionParameterFilterPrefix: 1,
-          WFActionParameterFilterTemplates: [{ Operator: 4, Property: 'Is Completed', Removable: true, Values: { Bool: false } }],
+          WFActionParameterFilterTemplates: [{ Operator: 4, Property: 'Is Completed', Removable: true, Bool: false, Values: { Bool: false }, VariableOverrides: {} }],
           WFContentPredicateBoundedDate: false,
         },
         WFSerializationType: 'WFContentPredicateTableTemplate',
@@ -168,67 +187,54 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
     action('text.combine', { UUID: COMBINED, text: attachment(output(LOOP1_END, 'Repeat Results')), WFTextSeparator: 'New Lines' }),
 
     // 2. Exchange with the journal
-    action('downloadurl', {
-      UUID: RESPONSE,
-      WFURL: opts.endpoint,
-      WFHTTPMethod: 'POST',
-      ShowHeaders: true,
-      WFHTTPHeaders: {
-        Value: {
-          WFDictionaryFieldValueItems: [
-            { WFItemType: 0, WFKey: plain('Authorization'), WFValue: plain(`Bearer ${opts.token}`) },
-            { WFItemType: 0, WFKey: plain('Content-Type'), WFValue: plain('text/plain; charset=utf-8') },
-            { WFItemType: 0, WFKey: plain('X-Journal-Format'), WFValue: plain('json') },
-            { WFItemType: 0, WFKey: plain('X-Journal-Shortcut'), WFValue: plain(SHORTCUT_VERSION) },
-          ],
-        },
-        WFSerializationType: 'WFDictionaryFieldValue',
-      },
-      WFHTTPBodyType: 'File',
-      WFRequestVariable: attachment(output(COMBINED, 'Combined Text')),
-    }),
+    post(opts.endpoint, output(COMBINED, 'Combined Text'), RESPONSE),
+    listOf(DELETES, 'deletes'),
+    listOf(CREATES, 'creates'),
+    listOf(UNDATED, 'undated'),
+    count(N_DELETES, DELETES, 'Dictionary Value'),
+    count(N_CREATES, CREATES, 'Dictionary Value'),
+    count(N_UNDATED, UNDATED, 'Dictionary Value'),
+    ...report(['reply deletes=', output(N_DELETES, 'Count'), ' creates=', output(N_CREATES, 'Count'), ' undated=', output(N_UNDATED, 'Count')]),
 
-    // 3. Apply commands. The reply is JSON ({ commands: [{ op, index, list, title, due }] }),
-    //    which Get Contents of URL hands over as a dictionary.
-    action('getvalueforkey', { UUID: LINES, WFInput: attachment(output(RESPONSE, 'Contents of URL')), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'commands' }),
-    action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 0, WFInput: attachment(output(LINES, 'Dictionary Value')) }),
-    field(OP, 'op'),
-
-    // delete: nth reminder of the snapshot → Remove Reminders
-    ifStart(IF_DELETE, output(OP, 'Dictionary Value'), IS, 'delete'),
+    // 3a. Deletes: nth reminder of the snapshot → Remove Reminders
+    loop(LOOP_D, DELETES, 'Dictionary Value'),
     field(IDX, 'index'),
-    item(REM, 'Reminders', output(IDX, 'Dictionary Value'), TARGET),
-    action('removereminders', { WFInputReminders: attachment(output(TARGET, 'Item from List')) }),
-    field(DELETED_TITLE, 'title'),
-    notify(['Removed ', output(DELETED_TITLE, 'Dictionary Value')]),
-    ifEnd(IF_DELETE),
+    action('getitemfromlist', { UUID: TARGET, WFInput: attachment(output(REM, 'Reminders')), WFItemSpecifier: 'Item At Index', WFItemIndex: attachment(output(IDX, 'Dictionary Value')) }),
+    action('removereminders', {}),
+    field(D_TITLE, 'title'),
+    notify(['Removed ', output(D_TITLE, 'Dictionary Value')]),
+    ...report(['removed ', output(IDX, 'Dictionary Value'), ' ', output(D_TITLE, 'Dictionary Value')]),
+    loopEnd(LOOP_D),
 
-    // create: Add New Reminder in the list, due at 9 am on the given day
-    ifStart(IF_CREATE, output(OP, 'Dictionary Value'), IS, 'create'),
-    field(ARG2, 'list'),
-    field(ARG3, 'title'),
-    field(ARG4, 'due'),
+    // 3b. Dated creates: Add New Reminder with an alert at `when`
+    loop(LOOP_C, CREATES, 'Dictionary Value'),
+    field(C_LIST, 'list'),
+    field(C_TITLE, 'title'),
+    field(C_WHEN, 'when'),
     action('addnewreminder', {
-      WFCalendarItemTitle: tokenText([output(ARG3, 'Dictionary Value')]),
-      WFCalendarItemCalendar: attachment(output(ARG2, 'Dictionary Value')),
+      WFCalendarItemTitle: tokenText([output(C_TITLE, 'Dictionary Value')]),
+      WFCalendarItemCalendar: attachment(output(C_LIST, 'Dictionary Value')),
       WFCalendarItemAlert: true,
       WFAlertTrigger: 'At Time',
-      WFAlertCustomTime: tokenText([output(ARG4, 'Dictionary Value'), ' 09:00']),
+      WFAlertCustomTime: tokenText([output(C_WHEN, 'Dictionary Value')]),
     }),
-    notify(['Added ', output(ARG3, 'Dictionary Value'), ' for ', output(ARG4, 'Dictionary Value')]),
-    ifEnd(IF_CREATE),
+    notify(['Added ', output(C_TITLE, 'Dictionary Value'), ' for ', output(C_WHEN, 'Dictionary Value')]),
+    ...report(['added ', output(C_TITLE, 'Dictionary Value'), ' | ', output(C_LIST, 'Dictionary Value'), ' | ', output(C_WHEN, 'Dictionary Value')]),
+    loopEnd(LOOP_C),
 
-    // create-undated: Add New Reminder in the list with no date
-    ifStart(IF_UNDATED, output(OP, 'Dictionary Value'), IS, 'create-undated'),
-    field(ARG5, 'list'),
-    field(ARG6, 'title'),
+    // 3c. Undated creates
+    loop(LOOP_U, UNDATED, 'Dictionary Value'),
+    field(U_LIST, 'list'),
+    field(U_TITLE, 'title'),
     action('addnewreminder', {
-      WFCalendarItemTitle: tokenText([output(ARG6, 'Dictionary Value')]),
-      WFCalendarItemCalendar: attachment(output(ARG5, 'Dictionary Value')),
+      WFCalendarItemTitle: tokenText([output(U_TITLE, 'Dictionary Value')]),
+      WFCalendarItemCalendar: attachment(output(U_LIST, 'Dictionary Value')),
     }),
-    notify(['Added ', output(ARG6, 'Dictionary Value')]),
-    ifEnd(IF_UNDATED),
-    action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 2 }),
+    notify(['Added ', output(U_TITLE, 'Dictionary Value')]),
+    ...report(['added ', output(U_TITLE, 'Dictionary Value'), ' | ', output(U_LIST, 'Dictionary Value'), ' | ']),
+    loopEnd(LOOP_U),
+
+    ...report(['done']),
   ];
 }
 
@@ -239,7 +245,7 @@ export function buildJournalSyncPlist(opts: ShortcutOptions): string {
     WFWorkflowMinimumClientVersionString: '900',
     WFWorkflowIcon: { WFWorkflowIconStartColor: 4282601983, WFWorkflowIconGlyphNumber: 59511 },
     WFWorkflowImportQuestions: [],
-    WFWorkflowTypes: ['NCWidget', 'WatchKit'],
+    WFWorkflowTypes: ['WFWorkflowTypeShowInSearch'],
     WFWorkflowInputContentItemClasses: ['WFAppStoreAppContentItem', 'WFArticleContentItem', 'WFContactContentItem', 'WFDateContentItem', 'WFEmailAddressContentItem', 'WFGenericFileContentItem', 'WFImageContentItem', 'WFiTunesProductContentItem', 'WFLocationContentItem', 'WFDCMapsLinkContentItem', 'WFAVAssetContentItem', 'WFPDFContentItem', 'WFPhoneNumberContentItem', 'WFRichTextContentItem', 'WFSafariWebPageContentItem', 'WFStringContentItem', 'WFURLContentItem'],
     WFWorkflowHasShortcutInputVariables: false,
     WFWorkflowHasOutputFallback: false,
