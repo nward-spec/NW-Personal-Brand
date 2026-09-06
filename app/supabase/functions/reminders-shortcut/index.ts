@@ -4,8 +4,11 @@
 //   Authorization: Bearer <token from the app's Settings>
 //   Body: plain text, one reminder per line: "title | list | due | completed"
 //
-// Responds with plain text, one command per line for the Shortcut to apply:
-//   "complete | list | title | ", "create | list | title | due", "delete | list | title | ".
+// With `X-Journal-Format: json` it answers { commands: [{ op, index, list, title, due }] }
+// (op: delete | create | create-undated); otherwise plain text, one command per
+// line: "delete | index | title | ", "create | list | title | due".
+// `X-Journal-Shortcut` carries the Shortcut's version, kept so the app can say
+// when a phone still runs an old one.
 //
 // Deployed with --no-verify-jwt: the Shortcut's token is checked here against
 // the shortcut_links table using the service role.
@@ -49,17 +52,21 @@ Deno.serve(async (req: Request) => {
       const { error: saveErr } = await admin.from('reminders').upsert(payload, { onConflict: 'user_id,uid' });
       if (saveErr) throw new Error(saveErr.message);
     }
+    const shortcutVersion = (req.headers.get('X-Journal-Shortcut') ?? '').trim() || (req.headers.get('X-Journal-Format') ? '2' : '1');
     const current = (link.dinners_list as string) ?? 'Dinners';
     const dinners = result.lists.includes(current) ? current : (result.lists.find((l) => /dinner|meal|food/i.test(l)) ?? current);
     await admin
       .from('shortcut_links')
-      .update({ lists: result.lists, dinners_list: dinners, last_sync_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() })
+      .update({ lists: result.lists, dinners_list: dinners, shortcut_version: shortcutVersion, last_sync_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() })
       .eq('user_id', userId);
 
-    console.log(`shortcut sync user=${userId} snapshot=${snapshot.length} pulled=${result.pulled} commands=${result.commands.length} tombstoned=${result.tombstoned}`);
+    console.log(`shortcut sync user=${userId} shortcut=v${shortcutVersion} snapshot=${snapshot.length} pulled=${result.pulled} commands=${result.commands.length} tombstoned=${result.tombstoned}`);
     if ((req.headers.get('X-Journal-Format') ?? '').toLowerCase() === 'json') {
       // Newer Shortcuts read the reply as a dictionary: no text splitting on the phone.
-      const commands = result.commands.map((c) => (c.op === 'delete' ? { op: 'delete', index: String(c.index), list: '', title: c.title, due: '' } : { op: 'create', index: '', list: c.list, title: c.title, due: c.due ?? '' }));
+      // One op per branch keeps the Shortcut's If actions to plain "is" comparisons.
+      const commands = result.commands.map((c) =>
+        c.op === 'delete' ? { op: 'delete', index: String(c.index), list: '', title: c.title, due: '' } : { op: c.due ? 'create' : 'create-undated', index: '', list: c.list, title: c.title, due: c.due ?? '' },
+      );
       return new Response(JSON.stringify({ commands, count: commands.length }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
     return text(formatCommands(result.commands));
