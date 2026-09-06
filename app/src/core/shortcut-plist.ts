@@ -5,8 +5,14 @@
 //   2. For each, write one line "title | list | due | completed".
 //   3. POST the lines to the reminders-shortcut function with the sync token.
 //   4. For each command in the JSON reply ({ commands: [{ op, index, list, title, due }] }):
-//        delete → nth reminder from step 1 → Remove Reminders
-//        create → Add New Reminder in the list (with a due date when given)
+//        delete         → nth reminder from step 1 → Remove Reminders
+//        create         → Add New Reminder in the list, due on the given day
+//        create-undated → Add New Reminder in the list, no date
+//      Each applied command posts a small notification so a run is visible.
+//
+// Plist shapes worth knowing: the If action wants its input wrapped as
+// { Type: 'Variable', Variable: <attachment> }; a bare attachment imports fine
+// but never matches, so every branch is skipped without an error.
 //
 // iOS only imports signed shortcut files. Sign on a Mac with:
 //   shortcuts sign --mode anyone --input "Journal Sync.shortcut" --output "Journal Sync (signed).shortcut"
@@ -66,9 +72,11 @@ interface Action {
 
 const action = (id: string, params: { [key: string]: PlistValue }): Action => ({ WFWorkflowActionIdentifier: `is.workflow.actions.${id}`, WFWorkflowActionParameters: params });
 
-/** WFCondition codes used by the If action. */
+/** WFCondition code used by the If action: "is". */
 const IS = 4;
-const HAS_ANY_VALUE = 100;
+
+/** Sent as X-Journal-Shortcut so the app can tell which Shortcut a phone runs. Bump when the Shortcut changes. */
+export const SHORTCUT_VERSION = '3';
 
 export interface ShortcutOptions {
   endpoint: string;
@@ -93,8 +101,11 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
   const ARG4 = uuid();
   const IF_DELETE = uuid();
   const TARGET = uuid();
+  const DELETED_TITLE = uuid();
   const IF_CREATE = uuid();
-  const IF_DUE = uuid();
+  const IF_UNDATED = uuid();
+  const ARG5 = uuid();
+  const ARG6 = uuid();
 
   const item = (source: string, sourceName: string, index: number | Ref, id: string) =>
     action('getitemfromlist', {
@@ -104,16 +115,18 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
       WFItemIndex: typeof index === 'number' ? index : tokenText([index]),
     });
 
-  const ifStart = (group: string, input: Ref, condition: number, value?: string) =>
+  const ifStart = (group: string, input: Ref, condition: number, value: string) =>
     action('conditional', {
       GroupingIdentifier: group,
       WFControlFlowMode: 0,
-      WFInput: attachment(input),
+      WFInput: { Type: 'Variable', Variable: attachment(input) },
       WFCondition: condition,
-      ...(value !== undefined ? { WFConditionalActionString: value } : {}),
+      WFConditionalActionString: value,
     });
-  const ifOtherwise = (group: string) => action('conditional', { GroupingIdentifier: group, WFControlFlowMode: 1 });
   const ifEnd = (group: string, id?: string) => action('conditional', { GroupingIdentifier: group, WFControlFlowMode: 2, ...(id ? { UUID: id } : {}) });
+  const notify = (parts: (string | Ref)[]) =>
+    action('notification', { WFNotificationActionTitle: 'Journal Sync', WFNotificationActionBody: tokenText(parts), WFNotificationActionSound: false });
+  const field = (id: string, key: string) => action('getvalueforkey', { UUID: id, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: key });
 
   return [
     action('comment', {
@@ -166,6 +179,7 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
             { WFItemType: 0, WFKey: plain('Authorization'), WFValue: plain(`Bearer ${opts.token}`) },
             { WFItemType: 0, WFKey: plain('Content-Type'), WFValue: plain('text/plain; charset=utf-8') },
             { WFItemType: 0, WFKey: plain('X-Journal-Format'), WFValue: plain('json') },
+            { WFItemType: 0, WFKey: plain('X-Journal-Shortcut'), WFValue: plain(SHORTCUT_VERSION) },
           ],
         },
         WFSerializationType: 'WFDictionaryFieldValue',
@@ -178,21 +192,22 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
     //    which Get Contents of URL hands over as a dictionary.
     action('getvalueforkey', { UUID: LINES, WFInput: attachment(output(RESPONSE, 'Contents of URL')), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'commands' }),
     action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 0, WFInput: attachment(output(LINES, 'Dictionary Value')) }),
-    action('getvalueforkey', { UUID: OP, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'op' }),
+    field(OP, 'op'),
 
     // delete: nth reminder of the snapshot → Remove Reminders
     ifStart(IF_DELETE, output(OP, 'Dictionary Value'), IS, 'delete'),
-    action('getvalueforkey', { UUID: IDX, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'index' }),
+    field(IDX, 'index'),
     item(REM, 'Reminders', output(IDX, 'Dictionary Value'), TARGET),
     action('removereminders', { WFInputReminders: attachment(output(TARGET, 'Item from List')) }),
+    field(DELETED_TITLE, 'title'),
+    notify(['Removed ', output(DELETED_TITLE, 'Dictionary Value')]),
     ifEnd(IF_DELETE),
 
-    // create: Add New Reminder in the list, dated when a due date is given
+    // create: Add New Reminder in the list, due at 9 am on the given day
     ifStart(IF_CREATE, output(OP, 'Dictionary Value'), IS, 'create'),
-    action('getvalueforkey', { UUID: ARG2, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'list' }),
-    action('getvalueforkey', { UUID: ARG3, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'title' }),
-    action('getvalueforkey', { UUID: ARG4, WFInput: attachment(repeatItem()), WFGetDictionaryValueType: 'Value', WFDictionaryKey: 'due' }),
-    ifStart(IF_DUE, output(ARG4, 'Dictionary Value'), HAS_ANY_VALUE),
+    field(ARG2, 'list'),
+    field(ARG3, 'title'),
+    field(ARG4, 'due'),
     action('addnewreminder', {
       WFCalendarItemTitle: tokenText([output(ARG3, 'Dictionary Value')]),
       WFCalendarItemCalendar: attachment(output(ARG2, 'Dictionary Value')),
@@ -200,13 +215,19 @@ export function buildJournalSyncActions(opts: ShortcutOptions): Action[] {
       WFAlertTrigger: 'At Time',
       WFAlertCustomTime: tokenText([output(ARG4, 'Dictionary Value'), ' 09:00']),
     }),
-    ifOtherwise(IF_DUE),
-    action('addnewreminder', {
-      WFCalendarItemTitle: tokenText([output(ARG3, 'Dictionary Value')]),
-      WFCalendarItemCalendar: attachment(output(ARG2, 'Dictionary Value')),
-    }),
-    ifEnd(IF_DUE),
+    notify(['Added ', output(ARG3, 'Dictionary Value'), ' for ', output(ARG4, 'Dictionary Value')]),
     ifEnd(IF_CREATE),
+
+    // create-undated: Add New Reminder in the list with no date
+    ifStart(IF_UNDATED, output(OP, 'Dictionary Value'), IS, 'create-undated'),
+    field(ARG5, 'list'),
+    field(ARG6, 'title'),
+    action('addnewreminder', {
+      WFCalendarItemTitle: tokenText([output(ARG6, 'Dictionary Value')]),
+      WFCalendarItemCalendar: attachment(output(ARG5, 'Dictionary Value')),
+    }),
+    notify(['Added ', output(ARG6, 'Dictionary Value')]),
+    ifEnd(IF_UNDATED),
     action('repeat.each', { GroupingIdentifier: LOOP2, WFControlFlowMode: 2 }),
   ];
 }

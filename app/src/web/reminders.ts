@@ -19,6 +19,8 @@ export interface RemindersAccount {
   lists: string[];
   lastSyncAt: string | null;
   lastError: string | null;
+  /** Version reported by the Shortcut on its last run; null until it has run. */
+  shortcutVersion: string | null;
 }
 
 export interface RemindersState {
@@ -70,12 +72,13 @@ const rowToAccount = (data: Record<string, unknown>): RemindersAccount => ({
   lists: (data.lists as string[]) ?? [],
   lastSyncAt: (data.last_sync_at as string | null) ?? null,
   lastError: (data.last_error as string | null) ?? null,
+  shortcutVersion: (data.shortcut_version as string | null) ?? null,
 });
 
 async function refreshAccount() {
   set({ loading: true });
   try {
-    const { data, error } = await client().from('shortcut_links').select('token, dinners_list, todo_list, lists, last_sync_at, last_error').maybeSingle();
+    const { data, error } = await client().from('shortcut_links').select('token, dinners_list, todo_list, lists, last_sync_at, last_error, shortcut_version').maybeSingle();
     if (error) throw new Error(error.message);
     set({ loading: false, account: data ? rowToAccount(data) : null, error: null });
   } catch (err) {
@@ -95,7 +98,7 @@ export const reminders = {
   /** Create the link row with a fresh token. */
   async connect(): Promise<RemindersAccount> {
     const token = randomToken();
-    const { data, error } = await client().from('shortcut_links').upsert({ token }, { onConflict: 'user_id' }).select('token, dinners_list, todo_list, lists, last_sync_at, last_error').single();
+    const { data, error } = await client().from('shortcut_links').upsert({ token }, { onConflict: 'user_id' }).select('token, dinners_list, todo_list, lists, last_sync_at, last_error, shortcut_version').single();
     if (error) throw new Error(error.message);
     const account = rowToAccount(data);
     set({ account, error: null });
