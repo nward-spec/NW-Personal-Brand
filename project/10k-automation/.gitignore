@@ -1,0 +1,8 @@
+# Runtime state: tokens, decisions, logs. Never committed.
+state/
+ops/secrets.env
+config/config.yaml
+config/gcal_client_secret.json
+__pycache__/
+*.pyc
+.venv/

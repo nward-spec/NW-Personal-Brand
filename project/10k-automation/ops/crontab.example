@@ -1,0 +1,4 @@
+# Linux alternative to the launchd job. The machine's own clock must be set to
+# Australia/Melbourne, or CRON_TZ must be, so 05:00 follows the AEDT change.
+CRON_TZ=Australia/Melbourne
+0 5 * * * /home/nick/NW-Personal-Brand/project/10k-automation/ops/run_daily.sh

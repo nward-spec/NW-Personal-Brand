@@ -1,0 +1,253 @@
+# ---------------------------------------------------------------------------
+# 10k PB block — 2XU Wellness Run, St Kilda, Sun 22 Nov 2026
+#
+# This file is DATA, not code. Hand-edit it when life intervenes; the engine
+# reads it fresh every morning.
+#
+# The one number that matters most is paces.goal_pace.range. The parkrun time
+# trial in week 4 recalibrates it, and every session written "@ goal_pace"
+# (weeks 5-10) follows automatically. Nothing else needs touching.
+# ---------------------------------------------------------------------------
+
+meta:
+  athlete: Nick
+  timezone: Australia/Melbourne
+  max_hr: 189
+  lthr: 168
+  race:
+    name: "2XU Wellness Run 10k"
+    location: "St Kilda foreshore"
+    date: 2026-11-22
+    distance_km: 10
+    goal: "37:00 primary, 36:30 stretch"
+  pb_10k: "38:0x"
+
+# Heart-rate zones, already set on the Forerunner 965.
+# Easy running is governed by HR. Quality is governed by pace; HR is a readout.
+zones:
+  z1: { max: 134, label: "Recovery" }
+  z2: { min: 135, max: 152, label: "Easy aerobic" }
+  z3: { min: 153, max: 161, label: "Steady" }
+  z4: { min: 162, max: 171, label: "Threshold" }
+  z5: { min: 172, label: "VO2 / 5k" }
+
+# ---------------------------------------------------------------------------
+# Paces. Values are min:sec per kilometre.
+#
+# goal_pace is the anchor. Anything with `from: goal_pace` is recomputed from
+# it, so a time-trial recalibration is a one-line edit here.
+# Absolute `range:` entries are deliberately NOT tied to goal pace — they are
+# aerobic paces that should not move when 10k fitness does.
+# ---------------------------------------------------------------------------
+paces:
+  goal_pace:
+    range: "3:40-3:45"
+    note: "Provisional until the week 4 parkrun. Edit this line, nothing else."
+  five_k:
+    from: goal_pace
+    offset_fast: -5
+    offset_slow: -5
+  threshold:
+    from: goal_pace
+    offset_fast: 20
+    offset_slow: 23
+  strides:
+    from: goal_pace
+    offset_fast: -25
+    width: 0                  # a single pace, not a band, whatever goal pace does
+  progression:
+    from: goal_pace
+    offset_fast: 25
+    offset_slow: 30
+    note: "Long-run finish: 4:15 drifting to 4:05 at current goal pace."
+  steady:
+    range: "4:25-4:35"
+  easy:
+    range: "5:00-5:30"
+    note: "Expectation, not a target. Never written onto a session."
+  recovery:
+    range: "5:20-5:50"
+
+# ---------------------------------------------------------------------------
+# Structural rules. The engine will not violate these.
+# ---------------------------------------------------------------------------
+rules:
+  run_days: [tue, wed, thu, sat, sun]
+  double_min_km: 5.0          # no run shorter than this, ever
+  double_threshold_km: 12.0   # single run until the day needs more than this
+  double_days: [tue, thu, sat] # never Wednesday (run club), never Sunday (long run)
+  long_run_cap_km: 20.0
+  max_easy_day_km: 24.0       # ceiling for a single easy day, doubles included
+  round_to_km: 0.5
+
+defaults:
+  quality_warmup_km: 3.0
+  quality_cooldown_km: 2.0
+  strides: { count: 4, seconds: 20 }
+  recovery_jog_pace: recovery
+  gym:
+    mon: "Lower body"
+    fri: "Upper + core"
+  # Run club cannot be prescribed: written as a duration placeholder only.
+  run_club:
+    estimate_km: 10.0
+    note: "Run club — their session. Placeholder only, reconciled Thursday."
+
+# Mon-Sun shape of every week. Overridden per-week by `days:` below.
+week_template:
+  mon: { kind: gym }
+  tue: { kind: easy, strides: true }
+  wed: { kind: run_club }
+  thu: { kind: easy }
+  fri: { kind: gym }
+  sat: { kind: quality }
+  sun: { kind: long_run }
+
+# ---------------------------------------------------------------------------
+# The block. Weeks run Mon-Sun.
+#
+# Quality volume by week: 32min, 36min, 36min, TT, 6km, 7.5km, 8km, 6km, 6km.
+# It builds, peaks at W7, and steps down without losing rep length.
+#
+# The limiter is long reps, not speed. Almost nothing under 1km after week 4.
+# ---------------------------------------------------------------------------
+weeks:
+  - number: 1
+    start: 2026-09-14
+    volume_km: 58
+    quality:
+      kind: intervals
+      name: "4 x 8min threshold"
+      reps: 4
+      rep: { minutes: 8 }
+      recovery: { seconds: 90 }
+      pace: threshold
+    long_run: { km: 14 }
+
+  - number: 2
+    start: 2026-09-21
+    volume_km: 65
+    quality:
+      kind: intervals
+      name: "3 x 12min threshold"
+      reps: 3
+      rep: { minutes: 12 }
+      recovery: { seconds: 120 }
+      pace: threshold
+    long_run: { km: 16 }
+
+  - number: 3
+    start: 2026-09-28
+    volume_km: 72
+    quality:
+      kind: intervals
+      name: "2 x 18min threshold"
+      reps: 2
+      rep: { minutes: 18 }
+      recovery: { seconds: 180 }
+      pace: threshold
+    long_run: { km: 18, progression_km: 4 }
+
+  - number: 4
+    start: 2026-10-05
+    volume_km: 62
+    note: "Down week. AEDT starts 4 Oct. parkrun time trial recalibrates goal pace."
+    quality:
+      kind: time_trial
+      name: "parkrun 5k TIME TRIAL"
+      distance_km: 5.0
+      pace: five_k
+    long_run: { km: 16 }
+
+  - number: 5
+    start: 2026-10-12
+    volume_km: 80
+    quality:
+      kind: intervals
+      name: "4 x 1500m @ GP"
+      reps: 4
+      rep: { km: 1.5 }
+      recovery: { seconds: 120 }
+      pace: goal_pace
+    long_run: { km: 18, progression_km: 5 }
+
+  - number: 6
+    start: 2026-10-19
+    volume_km: 86
+    quality:
+      kind: intervals
+      name: "3 x 2.5km @ GP"
+      reps: 3
+      rep: { km: 2.5 }
+      recovery: { seconds: 150 }
+      pace: goal_pace
+    long_run: { km: 20 }
+
+  - number: 7
+    start: 2026-10-26
+    volume_km: 90
+    note: "Peak week. The keystone session is Saturday."
+    keystone: true
+    quality:
+      kind: intervals
+      name: "2 x 4km @ GP"
+      reps: 2
+      rep: { km: 4.0 }
+      recovery: { seconds: 240 }
+      pace: goal_pace
+      keystone: true
+    long_run: { km: 20, progression_km: 6 }
+
+  - number: 8
+    start: 2026-11-02
+    volume_km: 76
+    note: "Down week."
+    quality:
+      kind: intervals
+      name: "3 x 2km @ GP"
+      reps: 3
+      rep: { km: 2.0 }
+      recovery: { seconds: 120 }
+      pace: goal_pace
+    long_run: { km: 18 }
+
+  - number: 9
+    start: 2026-11-09
+    volume_km: 68
+    quality:
+      kind: intervals
+      name: "2 x 3km @ GP"
+      reps: 2
+      rep: { km: 3.0 }
+      recovery: { seconds: 180 }
+      pace: goal_pace
+    long_run: { km: 16 }
+
+  - number: 10
+    start: 2026-11-16
+    volume_km: 42
+    race_week: true
+    note: "Race week. Taper reliably produces poor recovery scores - AMBER is ignored."
+    # Race week is prescribed day by day. The volume allocator does not run.
+    days:
+      tue: { kind: easy, km: 8.0 }
+      wed:
+        kind: run_club
+        estimate_km: 6.0
+        note: "CAPPED: 20min of work max, at goal pace, not faster. Do not race it."
+      thu: { kind: easy, km: 6.0 }
+      fri: { kind: rest, note: "No gym this week." }
+      sat:
+        kind: shakeout
+        minutes: 15
+        strides: true
+        name: "15min easy + 4 x 20s strides"
+      sun:
+        kind: race
+        name: "2XU Wellness Run 10k"
+        warmup_km: 3.0
+        strides: true
+        note: >-
+          First 2km at 3:45, settle to 3:40-3:42 through 8km, empty from there.
+          Exposed foreshore: if there is a headwind on an out-and-back leg,
+          sit in and do not fight it.

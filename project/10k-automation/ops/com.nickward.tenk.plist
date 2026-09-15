@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd job. 05:00 local time, which follows Melbourne through the
+  AEDT changeover on 4 October without any offset arithmetic.
+
+    cp ops/com.nickward.tenk.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.nickward.tenk.plist
+
+  Edit the two paths below to match where this repo lives.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nickward.tenk</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/nick/NW-Personal-Brand/project/10k-automation/ops/run_daily.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>5</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/Users/nick/NW-Personal-Brand/project/10k-automation</string>
+    <key>StandardOutPath</key>
+    <string>/Users/nick/NW-Personal-Brand/project/10k-automation/state/launchd.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/nick/NW-Personal-Brand/project/10k-automation/state/launchd.err</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

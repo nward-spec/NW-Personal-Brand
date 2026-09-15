@@ -1,0 +1,72 @@
+# Runtime configuration. Copy to config/config.yaml and fill in.
+# config/config.yaml is gitignored. No secret belongs in this file either —
+# secrets come from the environment variables named below.
+
+plan_file: config/plan.yaml
+state_dir: state           # token store, run state, logs (gitignored)
+
+engine:
+  # Rolling window written to intervals.icu every morning.
+  window_days: 10
+  # Circuit breaker: automatic modifications allowed per plan week before the
+  # engine starts flagging for review. The third one still fires.
+  max_modifications_per_week: 2
+
+whoop:
+  enabled: true
+  # Verified against developer.whoop.com on 2026-09-15. Overridable because
+  # these paths are versioned.
+  auth_url: https://api.prod.whoop.com/oauth/oauth2/auth
+  token_url: https://api.prod.whoop.com/oauth/oauth2/token
+  api_base: https://api.prod.whoop.com/developer/v2
+  redirect_uri: http://localhost:8723/callback
+  scopes: [read:recovery, read:sleep, read:cycles, read:workout, offline]
+  # Secrets: WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET
+  baseline_days: 14          # rolling HRV/RHR baseline, excluding last 24h
+  short_window_days: 3       # 3-day rolling HRV for the downgrade override
+  hrv_sd_multiple: 1.0       # downgrade if 3-day HRV < baseline - (1 x SD)
+  rhr_over_baseline_bpm: 5.0 # ...AND resting HR is this far over baseline
+  gym:
+    # Whoop workout matching for the Mon/Fri gym feed-forward. Names are
+    # matched case-insensitively against the workout's sport name; if the
+    # sport name is absent, any workout on a gym day counts.
+    sport_names: ["weightlifting", "strength trainer", "functional fitness"]
+    baseline_sessions: 6     # rolling gym-day strain baseline
+    strain_over_baseline_pct: 20
+
+intervals_icu:
+  enabled: true
+  api_base: https://intervals.icu/api/v1
+  athlete_id: "i00000"       # your intervals.icu athlete id, e.g. i12345
+  # Secret: INTERVALS_ICU_API_KEY (basic auth password; username is the
+  # literal string API_KEY)
+  external_id_prefix: "10k"  # gives 10k-w07-sat-am
+  run_type: Run
+  gym_type: WeightTraining
+
+google_calendar:
+  enabled: true
+  calendar_id: primary
+  # OAuth client secrets file downloaded from Google Cloud console.
+  client_secrets_file: config/gcal_client_secret.json
+  token_file: state/gcal_token.json
+  # Written into the event id so a re-run updates rather than duplicates.
+  event_id_prefix: tenk
+
+summary:
+  # Sunday evening Slack summary, delivered through the Ernest Ops email relay.
+  enabled: true
+  weekday: sun
+  channel_id: C0BG5NWRWLA   # #ep-operations
+  relay_to: nward@ernestperformance.com.au
+  subject_prefix: "[SLACK-RELAY]"
+  # Optional SMTP delivery. Without it the message is written to
+  # state/outbox/ and logged as undelivered - nothing is silently dropped.
+  smtp:
+    enabled: false
+    host: smtp.gmail.com
+    port: 587
+    starttls: true
+    username: nward@ernestperformance.com.au
+    from: nward@ernestperformance.com.au
+    # Secret: SMTP_PASSWORD (a Google app password, not the account password)
