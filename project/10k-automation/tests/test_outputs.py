@@ -115,6 +115,26 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("Recovery 48%", body)
         self.assertIn("baseline HRV 60.0 ms", body)
 
+    def test_keystone_label_is_dropped_once_the_session_is_downgraded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = AdjustmentEngine(self.plan, RunState(Path(tmp) / "s.json"))
+            red = TierDecision(date=QUALITY_DAY, tier=Tier.RED, base_tier=Tier.RED,
+                               reason="Recovery 28%.", recovery_score=28.0,
+                               baseline=Baseline(60.0, 4.0, 46.0, 14))
+            result = engine.apply(self.plan.day_plan(QUALITY_DAY), red)
+        title = build_title(result.day, tier="RED", modified=result.modified)
+        self.assertNotIn("KEYSTONE", title)
+        self.assertIn("easy", title)
+
+    def test_keystone_label_survives_a_rep_cut(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = AdjustmentEngine(self.plan, RunState(Path(tmp) / "s.json"))
+            amber = TierDecision(date=QUALITY_DAY, tier=Tier.AMBER, base_tier=Tier.AMBER,
+                                 reason="Recovery 48%.", recovery_score=48.0,
+                                 baseline=Baseline(60.0, 4.0, 46.0, 14))
+            result = engine.apply(self.plan.day_plan(QUALITY_DAY), amber)
+        self.assertIn("KEYSTONE", build_title(result.day, tier="AMBER", modified=True))
+
     def test_completion_title(self):
         day = self.plan.day_plan(dt.date(2026, 9, 15))
         title = completion_title(day, [Completion(day.date, "Easy", 10.0, 3120, 147, "Run")])

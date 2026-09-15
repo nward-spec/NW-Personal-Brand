@@ -58,7 +58,9 @@ def build_title(day: DayPlan, *, tier: Optional[str] = None, modified: bool = Fa
 
     parts = [run.workout.name for run in day.runs]
     title = f"{RUN_EMOJI} {label} — {' + '.join(parts)}"
-    if day.keystone:
+    # The keystone label belongs to the keystone session. Once recovery has
+    # downgraded it to an easy run, calling it the keystone is a lie.
+    if day.keystone and any(run.workout.kind == "quality" for run in day.runs):
         title += " (KEYSTONE)"
     if modified and tier:
         title = f"[{tier}] {title}"
