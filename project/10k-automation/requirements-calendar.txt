@@ -1,0 +1,16 @@
+# Google Calendar mirror only. Install this second, and only when you are
+# ready to connect the calendar - google_calendar.enabled: false in
+# config.yaml runs everything else without these.
+#
+# They are separate because google-auth pulls in cryptography, which is a
+# compiled package. From version 49 it ships macOS wheels for Apple Silicon
+# only, so on an Intel Mac pip falls back to building from source and needs a
+# Rust toolchain and OpenSSL headers to do it. 48.0.1 is the newest release
+# with a universal2 wheel built for Python 3.9, which covers Intel. The marker
+# applies the ceiling only where it is needed and leaves every other machine
+# on the current release.
+cryptography<49; sys_platform == "darwin" and platform_machine == "x86_64"
+
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-oauthlib>=1.1

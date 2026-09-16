@@ -1,9 +1,5 @@
-# Core
+# Core. This is all the engine, the test suite and the selftest need.
+# Both are pure-Python wheels on every platform, so installing this never
+# compiles anything.
 PyYAML>=6.0
 requests>=2.31
-
-# Google Calendar mirror. Only imported when google_calendar.enabled is true,
-# so the engine still runs (and dry-runs) without them installed.
-google-api-python-client>=2.100
-google-auth>=2.23
-google-auth-oauthlib>=1.1

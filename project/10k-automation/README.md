@@ -52,20 +52,33 @@ Without a clone yet:
 git clone https://github.com/nward-spec/NW-Personal-Brand.git ~/NW-Personal-Brand && cd ~/NW-Personal-Brand && git checkout claude/new-session-90lpm4
 ```
 
-Then build the virtualenv:
+Then build the virtualenv and check it works. `requirements.txt` is PyYAML and
+requests, both pure-Python wheels everywhere, so this compiles nothing and
+needs no credential:
 
 ```bash
-cd ~/NW-Personal-Brand/project/10k-automation && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd ~/NW-Personal-Brand/project/10k-automation && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python -m unittest discover -s tests -t . && .venv/bin/python -m tenk.cli selftest
 ```
 
-Check it works before connecting anything. Neither of these needs a credential:
+Expect 127 tests passing, then 13 scenarios and 0 failures.
+
+The Google Calendar libraries are a separate install, because they are the only
+heavy thing here. Leave them until you actually want the calendar mirror; with
+`google_calendar.enabled: false` in `config.yaml` everything else runs without
+them:
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -t . && .venv/bin/python -m tenk.cli selftest
+.venv/bin/pip install -r requirements-calendar.txt
 ```
 
-Expect 127 tests passing, then 13 scenarios and 0 failures. Then connect the
-accounts:
+If that fails trying to compile `cryptography`, your pip is ignoring the
+version ceiling in that file. From version 49, `cryptography` publishes macOS
+wheels for Apple Silicon only, so an Intel Mac has to build it from source and
+needs a Rust toolchain and OpenSSL headers. The ceiling picks 48.0.1, the
+newest release with a universal2 wheel built for Python 3.9. Force it by hand
+with `.venv/bin/pip install "cryptography<49"` before installing the rest.
+
+Then connect the accounts:
 
 ```bash
 cp config/config.example.yaml config/config.yaml
@@ -279,6 +292,8 @@ tenk/gcal.py                calendar mirror and ✅ write-back
 tenk/summary.py             Sunday Slack summary via the Ernest Ops relay
 tenk/engine.py              the morning run, start to finish
 tenk/selftest.py            13 scenarios against synthetic Whoop data
+requirements.txt            core dependencies: PyYAML and requests, nothing compiled
+requirements-calendar.txt   the Google Calendar libraries, installed separately
 ops/                        launchd job, crontab, secrets template
 synthetic/                  synthetic Whoop payloads and their generator
 tests/                      125 tests, standard library only
