@@ -33,21 +33,35 @@ Needs Python 3.9 or newer. The system `python3` on a current macOS is 3.9 and is
 enough — verified against 3.9 and 3.11.
 
 Every command below runs from `project/10k-automation` inside a clone of this
-repository. Nothing is pasted with a trailing `#` comment, because interactive
-zsh passes `#` through as an argument instead of starting a comment.
+repository, on the branch that carries it. Two things about pasting them into
+zsh: no line has a trailing `#` comment, because interactive zsh passes `#`
+through as an argument rather than starting a comment, and each block is chained
+with `&&` so a failed step stops the rest instead of letting them run in the
+wrong directory.
+
+This lives on the branch `claude/new-session-90lpm4`, not on `main`. In an
+existing clone:
 
 ```bash
-git clone https://github.com/nward-spec/NW-Personal-Brand.git
-cd NW-Personal-Brand/project/10k-automation
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+cd ~/NW-Personal-Brand && git fetch origin && git checkout claude/new-session-90lpm4
+```
+
+Without a clone yet:
+
+```bash
+git clone https://github.com/nward-spec/NW-Personal-Brand.git ~/NW-Personal-Brand && cd ~/NW-Personal-Brand && git checkout claude/new-session-90lpm4
+```
+
+Then build the virtualenv:
+
+```bash
+cd ~/NW-Personal-Brand/project/10k-automation && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 Check it works before connecting anything. Neither of these needs a credential:
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -t .
-.venv/bin/python -m tenk.cli selftest
+.venv/bin/python -m unittest discover -s tests -t . && .venv/bin/python -m tenk.cli selftest
 ```
 
 Expect 127 tests passing, then 13 scenarios and 0 failures. Then connect the
