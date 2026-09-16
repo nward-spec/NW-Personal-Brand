@@ -178,7 +178,18 @@ def cmd_selftest(args) -> int:
     return run_selftest(scenario=args.scenario, date=_date(args.date))
 
 
+MIN_PYTHON = (3, 9)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
+    if sys.version_info < MIN_PYTHON:
+        print(
+            f"This needs Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]} or newer; this is "
+            f"{sys.version.split()[0]}. Make the virtualenv with a newer python3 and "
+            f"run it through .venv/bin/python.",
+            file=sys.stderr,
+        )
+        return 2
     parser = argparse.ArgumentParser(prog="tenk", description="10k PB daily automation")
     parser.add_argument("--config", default=None, help="path to config.yaml")
     sub = parser.add_subparsers(dest="command", required=True)

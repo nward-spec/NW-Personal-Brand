@@ -29,26 +29,55 @@ paces:
 
 ## Setup
 
+Needs Python 3.9 or newer. The system `python3` on a current macOS is 3.9 and is
+enough — verified against 3.9 and 3.11.
+
+Every command below runs from `project/10k-automation` inside a clone of this
+repository. Nothing is pasted with a trailing `#` comment, because interactive
+zsh passes `#` through as an argument instead of starting a comment.
+
 ```bash
-cd project/10k-automation
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-
-cp config/config.example.yaml config/config.yaml   # fill in athlete ids
-cp ops/secrets.env.example ops/secrets.env         # fill in secrets
-chmod 600 ops/secrets.env
-
-.venv/bin/python -m tenk.cli selftest              # synthetic data, writes nothing
-.venv/bin/python -m tenk.cli authorize             # one-time Whoop OAuth, needs a browser
-.venv/bin/python -m tenk.cli run --dry-run         # real data, prints every write
+git clone https://github.com/nward-spec/NW-Personal-Brand.git
+cd NW-Personal-Brand/project/10k-automation
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-Only when the dry run looks right:
+Check it works before connecting anything. Neither of these needs a credential:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -t .
+.venv/bin/python -m tenk.cli selftest
+```
+
+Expect 127 tests passing, then 13 scenarios and 0 failures. Then connect the
+accounts:
+
+```bash
+cp config/config.example.yaml config/config.yaml
+cp ops/secrets.env.example ops/secrets.env
+chmod 600 ops/secrets.env
+```
+
+Put the intervals.icu athlete id in `config/config.yaml`, the API keys in
+`ops/secrets.env`, then authorise Whoop once and dry run against real data:
+
+```bash
+.venv/bin/python -m tenk.cli authorize
+.venv/bin/python -m tenk.cli run --dry-run --window
+```
+
+The dry run prints every write and executes none. Only when it looks right:
 
 ```bash
 .venv/bin/python -m tenk.cli run
 cp ops/com.nickward.tenk.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.nickward.tenk.plist
 ```
+
+The launchd job hard-codes its paths — open
+`ops/com.nickward.tenk.plist` and change the two paths to where the clone
+actually lives before loading it.
 
 Linux instead of macOS: use `ops/crontab.example`.
 
@@ -67,7 +96,7 @@ Sunday summary is to send itself.
 | `python -m tenk.cli selftest` | 13 scenarios against synthetic Whoop data |
 | `python -m tenk.cli summary` | Build and deliver the Sunday Slack summary |
 | `python -m tenk.cli authorize` | One-time Whoop OAuth |
-| `python -m unittest discover -s tests -t .` | The test suite |
+| `python -m unittest discover -s tests -t .` | The test suite (127 tests) |
 
 ## How the morning works
 
