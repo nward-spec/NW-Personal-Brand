@@ -1,0 +1,96 @@
+# Proof that the 10k automation sets up and passes on a clean machine.
+#
+# The Intel macOS job is the one that matters: same architecture and same
+# Python version as the laptop this runs on, doing exactly what the README
+# tells a human to do. If this workflow is green, the documented setup works
+# on that machine and any failure there is local to it.
+
+name: 10k automation
+
+on:
+  push:
+    paths:
+      - 'project/10k-automation/**'
+      - '.github/workflows/10k-automation.yml'
+  pull_request:
+    paths:
+      - 'project/10k-automation/**'
+      - '.github/workflows/10k-automation.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: project/10k-automation
+
+jobs:
+  intel-mac:
+    name: Intel Mac, Python 3.9 (the target machine)
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Show the environment
+        run: |
+          python3 -c "import platform, sys; print(platform.platform()); print(platform.machine()); print(sys.version)"
+
+      - name: Run setup.sh exactly as the README says
+        run: ops/setup.sh
+
+      - name: Run it again from an unrelated directory
+        working-directory: /
+        run: "$GITHUB_WORKSPACE/project/10k-automation/ops/setup.sh"
+
+      - name: Install the Google Calendar libraries
+        run: |
+          .venv/bin/python -m pip install -r requirements-calendar.txt
+          .venv/bin/python -c "import cryptography; print('cryptography', cryptography.__version__)"
+          .venv/bin/python -c "import googleapiclient, google.auth; print('google client libraries import cleanly')"
+
+      - name: Dry run the engine with every integration disabled
+        run: |
+          mkdir -p /tmp/tenk-ci
+          cat > /tmp/tenk-ci/config.yaml <<'CFG'
+          plan_file: config/plan.yaml
+          state_dir: /tmp/tenk-ci/state
+          engine: {window_days: 10, max_modifications_per_week: 2}
+          whoop: {enabled: false}
+          intervals_icu: {enabled: false, athlete_id: "i00000"}
+          google_calendar: {enabled: false}
+          summary: {enabled: false, channel_id: "C0BG5NWRWLA"}
+          CFG
+          .venv/bin/python -m tenk.cli --config /tmp/tenk-ci/config.yaml run --dry-run --window --date 2026-10-31
+          .venv/bin/python -m tenk.cli show --week 7
+
+  linux:
+    name: Linux, Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run setup.sh
+        run: ops/setup.sh
+
+  apple-silicon:
+    name: Apple Silicon Mac, Python 3.11
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run setup.sh
+        run: ops/setup.sh
+      - name: Install the Google Calendar libraries
+        run: |
+          .venv/bin/python -m pip install -r requirements-calendar.txt
+          .venv/bin/python -c "import cryptography; print('cryptography', cryptography.__version__)"
