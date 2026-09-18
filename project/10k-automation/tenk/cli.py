@@ -144,6 +144,32 @@ def cmd_authorize(args) -> int:
     return 0
 
 
+def cmd_check(args) -> int:
+    """Verify the setup and name anything missing. Reads secrets, prints none."""
+    from .doctor import Doctor, render
+
+    config = Config.load(args.config)
+    setup(logging.WARNING)
+
+    def intervals_factory():
+        from .engine import DailyEngine
+        return DailyEngine(config, dry_run=True)._intervals_client()
+
+    def whoop_factory():
+        from .engine import DailyEngine
+        return DailyEngine(config, dry_run=True)._whoop_client()
+
+    doctor = Doctor(
+        config,
+        intervals_factory=None if args.offline else intervals_factory,
+        whoop_factory=None if args.offline else whoop_factory,
+        today=_date(args.date),
+    )
+    checks = doctor.run()
+    print(render(checks))
+    return 1 if any(c.blocking for c in checks) else 0
+
+
 def cmd_show(args) -> int:
     from .adjust import summarise_day
 
@@ -208,6 +234,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     authorize = sub.add_parser("authorize", help="one-time Whoop OAuth")
     authorize.set_defaults(func=cmd_authorize)
+
+    check = sub.add_parser("check", help="verify the setup and say what is missing")
+    check.add_argument("--offline", action="store_true",
+                       help="skip the network checks, only look at files and secrets")
+    check.add_argument("--date", help="pretend today is this date (YYYY-MM-DD)")
+    check.set_defaults(func=cmd_check)
 
     show = sub.add_parser("show", help="print the plan as it stands")
     show.add_argument("--week", type=int)

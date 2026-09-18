@@ -141,6 +141,37 @@ class IntervalsClient:
         log.info("intervals.icu: wrote %d events", len(payload))
         return {"written": len(payload), "response": _safe_json(response)}
 
+    def athlete(self) -> Mapping[str, Any]:
+        """GET /athlete/{id} — the cheapest way to prove the key and id are right."""
+        response = self.session.get(
+            f"{self.api_base}/athlete/{self.athlete_id}", timeout=self.timeout
+        )
+        if response.status_code in (401, 403):
+            raise RuntimeError(
+                f"intervals.icu rejected the API key ({response.status_code})"
+            )
+        if response.status_code == 404:
+            raise RuntimeError(f"intervals.icu has no athlete {self.athlete_id!r}")
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"intervals.icu athlete lookup failed ({response.status_code}): {response.text[:200]}"
+            )
+        body = _safe_json(response)
+        return body if isinstance(body, Mapping) else {}
+
+    def connections(self) -> Mapping[str, Any]:
+        """GET /athlete/{id}/connections — carries garmin_training_connected,
+        which is what decides whether a planned workout reaches the watch."""
+        response = self.session.get(
+            f"{self.api_base}/athlete/{self.athlete_id}/connections", timeout=self.timeout
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"intervals.icu connections failed ({response.status_code}): {response.text[:200]}"
+            )
+        body = _safe_json(response)
+        return body if isinstance(body, Mapping) else {}
+
     def activities(self, oldest: dt.date, newest: dt.date) -> List[Mapping[str, Any]]:
         response = self.session.get(
             self._url("activities"),

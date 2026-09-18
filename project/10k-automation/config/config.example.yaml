@@ -45,7 +45,10 @@ intervals_icu:
   gym_type: WeightTraining
 
 google_calendar:
-  enabled: true
+  # Off by default so a first setup has one less thing to install. Turn it on
+  # once you have run `pip install -r requirements-calendar.txt` and downloaded
+  # an OAuth client secret. Everything else works with this off.
+  enabled: false
   calendar_id: primary
   # OAuth client secrets file downloaded from Google Cloud console.
   client_secrets_file: config/gcal_client_secret.json

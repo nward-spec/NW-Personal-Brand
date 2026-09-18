@@ -79,39 +79,46 @@ needs a Rust toolchain and OpenSSL headers. The ceiling picks 48.0.1, the
 newest release with a universal2 wheel built for Python 3.9. Force it by hand
 with `.venv/bin/pip install "cryptography<49"` before installing the rest.
 
-Then connect the accounts:
+## Connecting the accounts
+
+Three things live outside this repo and only you can set them up.
+
+**1. intervals.icu to Garmin.** On intervals.icu open Settings and tick
+**Upload planned workouts**, then approve the Garmin permission screen. Without
+this nothing reaches the watch, however well everything else works. A workout on
+the calendar for today or tomorrow uploads automatically, and the Forerunner 965
+accepts structured workouts. `tenk check` reports this as the `garmin` line, read
+from `garmin_training_connected` on the intervals.icu API.
+
+**2. intervals.icu API key.** Settings, then Developer Settings. Put it in
+`ops/secrets.env` as `INTERVALS_ICU_API_KEY`, and put your athlete id (the
+`i#####` in the intervals.icu URL) in `config/config.yaml`.
+
+**3. Whoop app.** At `developer-dashboard.whoop.com`, create a team if you have
+none, then an app. Set the redirect URI to `http://localhost:8723/callback` and
+request the scopes `read:recovery read:sleep read:cycles read:workout offline`.
+The client id and secret appear after creation; put both in `ops/secrets.env`.
+
+Google Calendar is optional and off by default. Turn it on once you have
+installed `requirements-calendar.txt` and downloaded a Desktop app OAuth client
+from Google Cloud with the Calendar API enabled.
+
+Then, from `project/10k-automation`:
 
 ```bash
-cp config/config.example.yaml config/config.yaml
-cp ops/secrets.env.example ops/secrets.env
-chmod 600 ops/secrets.env
-```
-
-Put the intervals.icu athlete id in `config/config.yaml`, the API keys in
-`ops/secrets.env`, then authorise Whoop once and dry run against real data:
-
-```bash
+source ops/secrets.env
+.venv/bin/python -m tenk.cli check
 .venv/bin/python -m tenk.cli authorize
+.venv/bin/python -m tenk.cli check
 .venv/bin/python -m tenk.cli run --dry-run --window
 ```
 
-The dry run prints every write and executes none. Only when it looks right:
+`check` names anything still missing and the fix for it, and never prints a
+secret. When it is clean and the dry run looks right:
 
 ```bash
 .venv/bin/python -m tenk.cli run
-cp ops/com.nickward.tenk.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.nickward.tenk.plist
 ```
-
-The launchd job hard-codes its paths — open
-`ops/com.nickward.tenk.plist` and change the two paths to where the clone
-actually lives before loading it.
-
-Linux instead of macOS: use `ops/crontab.example`.
-
-Secrets are environment variables, never files in the repo: `WHOOP_CLIENT_ID`,
-`WHOOP_CLIENT_SECRET`, `INTERVALS_ICU_API_KEY`, and `SMTP_PASSWORD` if the
-Sunday summary is to send itself.
 
 ## Commands
 
@@ -124,7 +131,8 @@ Sunday summary is to send itself.
 | `python -m tenk.cli selftest` | 13 scenarios against synthetic Whoop data |
 | `python -m tenk.cli summary` | Build and deliver the Sunday Slack summary |
 | `python -m tenk.cli authorize` | One-time Whoop OAuth |
-| `ops/setup.sh` | Create the venv, install, test, run the scenarios |
+| `ops/setup.sh` | Create the venv, install, test, scaffold config, report what is missing |
+| `python -m tenk.cli check` | Verify every connection and name anything missing |
 | `python -m unittest discover -s tests -t .` | The test suite (127 tests) |
 
 ## How the morning works
@@ -294,6 +302,7 @@ tenk/gcal.py                calendar mirror and ✅ write-back
 tenk/summary.py             Sunday Slack summary via the Ernest Ops relay
 tenk/engine.py              the morning run, start to finish
 tenk/selftest.py            13 scenarios against synthetic Whoop data
+tenk/doctor.py              the check command: verifies every connection
 requirements.txt            core dependencies: PyYAML and requests, nothing compiled
 requirements-calendar.txt   the Google Calendar libraries, installed separately
 ops/setup.sh                one-shot setup and verification, run it from anywhere

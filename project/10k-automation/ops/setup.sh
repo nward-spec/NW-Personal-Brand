@@ -58,19 +58,41 @@ echo "==> Running the test suite"
 echo "==> Running the scenarios against synthetic Whoop data"
 .venv/bin/python -m tenk.cli selftest
 
+# Scaffold the two files that hold settings and secrets, so there is nothing to
+# copy by hand. Existing files are never touched.
+NEW_CONFIG=0
+if [[ ! -f config/config.yaml ]]; then
+  cp config/config.example.yaml config/config.yaml
+  NEW_CONFIG=1
+  echo "==> Created config/config.yaml"
+fi
+if [[ ! -f ops/secrets.env ]]; then
+  cp ops/secrets.env.example ops/secrets.env
+  chmod 600 ops/secrets.env
+  NEW_CONFIG=1
+  echo "==> Created ops/secrets.env (0600)"
+fi
+
+echo "==> Checking what is still missing"
+set +e
+.venv/bin/python -m tenk.cli check --offline
+CHECK=$?
+set -e
+
 cat <<'DONE'
 
-==> Setup finished. Everything above passed.
+==> Setup finished. The tests and scenarios passed.
 
-Next, look at the block as it stands:
+Fill in the two files the check above named, then:
 
-    .venv/bin/python -m tenk.cli show --week 7
-
-To connect the accounts, copy config/config.example.yaml to config/config.yaml
-and ops/secrets.env.example to ops/secrets.env, fill both in, then:
-
+    source ops/secrets.env
+    .venv/bin/python -m tenk.cli check
     .venv/bin/python -m tenk.cli authorize
+    .venv/bin/python -m tenk.cli check
     .venv/bin/python -m tenk.cli run --dry-run --window
 
-The dry run prints every write and executes none.
+`check` names anything still missing and what to do about it. The dry run
+prints every write and executes none.
 DONE
+
+exit 0
