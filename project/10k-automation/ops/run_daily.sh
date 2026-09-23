@@ -26,6 +26,7 @@ mkdir -p state
 "$PYTHON" -m tenk.cli run "$@" >> state/cron.log 2>&1
 
 # Sunday evening: the weekly summary goes to Slack through the Ernest Ops relay.
-if [[ "$(date +%u)" == "7" && "${1:-}" != "--dry-run" ]]; then
+# Only on the last firing of the day, so it is sent once.
+if [[ "$(date +%u)" == "7" && "$(date +%H)" -ge 11 && "${1:-}" != "--dry-run" ]]; then
   "$PYTHON" -m tenk.cli summary >> state/cron.log 2>&1 || true
 fi

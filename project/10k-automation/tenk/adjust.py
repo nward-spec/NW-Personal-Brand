@@ -131,7 +131,14 @@ class AdjustmentEngine:
 
     # ------------------------------------------------------------------ main
 
-    def apply(self, day: DayPlan, decision: TierDecision, *, gym_note: Optional[str] = None) -> AdjustedDay:
+    def apply(
+        self,
+        day: DayPlan,
+        decision: TierDecision,
+        *,
+        gym_note: Optional[str] = None,
+        already_done: bool = False,
+    ) -> AdjustedDay:
         day = copy.deepcopy(day)
         result = AdjustedDay(day=day, decision=decision, original_summary=summarise_day(day))
         week = self.plan.week_for(day.date)
@@ -142,6 +149,13 @@ class AdjustmentEngine:
 
         if decision.data_available is False:
             day.add_note("No Whoop recovery this morning. Prescribed as written; the gap is logged.")
+
+        # The engine runs more than once a morning, because Whoop does not score
+        # a night until the athlete wakes. A later run must never rewrite a
+        # session that has already been run.
+        if already_done:
+            day.add_note("Already completed today. Left exactly as it was run.")
+            return result
 
         # Nothing to take away from a gym day or a rest day.
         if day.gym is not None or not day.runs:

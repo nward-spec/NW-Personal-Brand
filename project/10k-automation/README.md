@@ -60,7 +60,7 @@ core dependencies, runs the test suite and runs the scenarios:
 ~/NW-Personal-Brand/project/10k-automation/ops/setup.sh
 ```
 
-Expect 158 tests passing, then 13 scenarios and 0 failures. Nothing it installs
+Expect 162 tests passing, then 13 scenarios and 0 failures. Nothing it installs
 is compiled, and it needs no credentials.
 
 The Google Calendar libraries are a separate install, because they are the only
@@ -133,7 +133,7 @@ secret. When it is clean and the dry run looks right:
 | `python -m tenk.cli authorize` | One-time Whoop OAuth |
 | `ops/setup.sh` | Create the venv, install, test, scaffold config, report what is missing |
 | `python -m tenk.cli check` | Verify every connection and name anything missing |
-| `python -m unittest discover -s tests -t .` | The test suite (158 tests) |
+| `python -m unittest discover -s tests -t .` | The test suite (162 tests) |
 
 ## How the morning works
 
@@ -231,6 +231,26 @@ engine says so in the day's notes.
 - Easy running is governed by heart rate; no pace target is ever written on an
   easy run. Quality is governed by pace; heart rate is a readout only.
 
+## When it runs, and why more than once
+
+Whoop does not score a night until you wake, so a single 05:00 run usually
+finds no recovery and falls back to green. The job therefore fires at 05:00,
+06:30, 08:00, 09:30 and 11:00. The first exists for Wednesday, so the session
+reaches the watch before run club at 05:50; the rest catch the recovery score
+whenever it lands and rewrite the day with the right tier.
+
+Running repeatedly is safe by construction:
+
+- intervals.icu events upsert on their `external_id`, so a re-run overwrites
+  rather than duplicates.
+- A modification is recorded against its date, so the two-a-week circuit
+  breaker does not count the same day five times.
+- **A session already logged as completed is never rewritten.** If you run at
+  07:00 and an amber score arrives at 09:30, the engine leaves the finished
+  session exactly as you ran it.
+
+The Sunday summary is sent only on the last firing, so it arrives once.
+
 ## Logs and state
 
 Everything lands in `state/` (gitignored):
@@ -309,5 +329,5 @@ requirements-calendar.txt   the Google Calendar libraries, installed separately
 ops/setup.sh                one-shot setup and verification, run it from anywhere
 ops/                        launchd job, crontab, secrets template
 synthetic/                  synthetic Whoop payloads and their generator
-tests/                      158 tests, standard library only
+tests/                      162 tests, standard library only
 ```

@@ -224,7 +224,12 @@ class DailyEngine:
             log.info("run club on %s came back as %.1f km; the rest of the week rebalances", wednesday, km)
 
         today_plan = self.build_day(self.today, completions)
-        adjusted = self.engine.apply(today_plan, decision, gym_note=gym_note)
+        already_done = bool(completions.get(self.today))
+        if already_done:
+            log.info("today's session is already logged; leaving it untouched")
+        adjusted = self.engine.apply(
+            today_plan, decision, gym_note=gym_note, already_done=already_done
+        )
         for flag in adjusted.flags:
             log.warning("%s", flag)
 

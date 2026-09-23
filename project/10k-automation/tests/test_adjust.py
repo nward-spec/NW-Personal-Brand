@@ -139,6 +139,40 @@ class ConsecutiveRedTests(EngineCase):
         self.assertFalse(result.day.rest)
 
 
+class AlreadyRunTests(EngineCase):
+    """The job runs several times a morning; a finished session is final."""
+
+    def test_a_completed_quality_session_is_not_cut(self):
+        result = self.engine.apply(
+            self.plan.day_plan(QUALITY_DAY), decision(QUALITY_DAY, Tier.AMBER),
+            already_done=True,
+        )
+        self.assertFalse(result.modified)
+        self.assertEqual(result.day.runs[0].workout.name, "2 x 4km @ 3:40-3:45")
+
+    def test_a_completed_long_run_is_not_cut_on_red(self):
+        result = self.engine.apply(
+            self.plan.day_plan(LONG_RUN_DAY), decision(LONG_RUN_DAY, Tier.RED),
+            already_done=True,
+        )
+        self.assertFalse(result.modified)
+        self.assertAlmostEqual(result.day.runs[0].km, 20.0, delta=0.1)
+
+    def test_it_says_why_it_left_the_day_alone(self):
+        result = self.engine.apply(
+            self.plan.day_plan(QUALITY_DAY), decision(QUALITY_DAY, Tier.RED),
+            already_done=True,
+        )
+        self.assertTrue(any("Already completed" in n for n in result.day.notes))
+
+    def test_an_unfinished_day_is_still_adjusted(self):
+        result = self.engine.apply(
+            self.plan.day_plan(QUALITY_DAY), decision(QUALITY_DAY, Tier.AMBER),
+            already_done=False,
+        )
+        self.assertTrue(result.modified)
+
+
 class CircuitBreakerTests(EngineCase):
     def test_third_modification_fires_but_is_flagged(self):
         for stamp in ("2026-10-27", "2026-10-29"):
