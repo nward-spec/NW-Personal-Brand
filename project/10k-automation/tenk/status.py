@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -120,18 +121,46 @@ def build_status(
     return payload
 
 
-def write_status(paths: Sequence[Path], payload: Mapping[str, Any]) -> List[Path]:
-    """Write the status to each configured location. A sync folder that is
-    not there today is skipped with a warning, never a crash."""
+def write_status(
+    paths: Sequence[Path],
+    payload: Mapping[str, Any],
+    *,
+    atomic_first: bool = True,
+) -> List[Path]:
+    """Write the status to each configured location. A sync folder that is not
+    there today is skipped with a warning, never a crash.
+
+    The first path is the local record and is written atomically, through a
+    temp file and a rename, so a crash cannot leave it half written.
+
+    Every other path is a sync destination and is written IN PLACE instead.
+    Google Drive and friends watch the filesystem, and their watchers
+    routinely miss a rename - the file lands on disk and is simply never
+    uploaded. An ordinary open, write, close is what they notice. These copies
+    are disposable: the next run rewrites them, so durability is not worth the
+    sync failure.
+    """
     written: List[Path] = []
-    for path in paths:
+    for index, path in enumerate(paths):
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(path, payload, mode=0o644)
+            if index == 0 and atomic_first:
+                atomic_write_json(path, payload, mode=0o644)
+            else:
+                _write_in_place(path, payload)
             written.append(path)
         except Exception as exc:
             log.warning("could not write status to %s: %s", path, exc)
     return written
+
+
+def _write_in_place(path: Path, payload: Mapping[str, Any]) -> None:
+    """Truncate and rewrite the file itself, so a sync client sees a change."""
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True, default=str)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.chmod(path, 0o644)
 
 
 def _pace(km: float, seconds: int) -> Optional[str]:

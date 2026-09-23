@@ -132,6 +132,27 @@ class WriteTests(StatusCase):
         written = write_status([blocker / "s.json", good], {"schema": 1})
         self.assertEqual(written, [good])
 
+    def test_sync_destinations_are_written_in_place(self):
+        """A rename is what sync clients miss, so only the first path uses one."""
+        import os
+        root = Path(self.tmp.name)
+        local, synced = root / "local.json", root / "synced.json"
+        write_status([local, synced], {"schema": 1})
+        before = os.stat(synced).st_ino
+        write_status([local, synced], {"schema": 2})
+        self.assertEqual(os.stat(synced).st_ino, before,
+                         "the synced copy must keep its inode, not be replaced")
+        self.assertEqual(json.loads(synced.read_text())["schema"], 2)
+
+    def test_the_local_copy_is_still_written_atomically(self):
+        import os
+        root = Path(self.tmp.name)
+        local = root / "local.json"
+        write_status([local], {"schema": 1})
+        before = os.stat(local).st_ino
+        write_status([local], {"schema": 2})
+        self.assertNotEqual(os.stat(local).st_ino, before)
+
     def test_the_file_is_readable_not_private(self):
         target = Path(self.tmp.name) / "s.json"
         write_status([target], {"schema": 1})
