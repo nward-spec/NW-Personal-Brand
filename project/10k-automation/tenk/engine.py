@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 from zoneinfo import ZoneInfo
 
@@ -28,6 +29,7 @@ from .intervals_icu import (
     completions_by_date,
 )
 from .logging_setup import log_decision
+from .status import build_status, write_status
 from .plan import DayPlan, Plan, WEEKDAYS, weekday_key
 from .state import RunState, TokenStore
 from .tiers import Tier, TierDecision, classify
@@ -289,6 +291,8 @@ class DailyEngine:
 
             report.completions_marked = self._write_back_completions(mirror, completions)
 
+        self._write_status(adjusted, completions, warnings)
+
         self.state.save()
         report.warnings = _unique(warnings + list(decision.warnings))
         log.info("today: %s", report.today_summary)
@@ -313,6 +317,36 @@ class DailyEngine:
             except Exception as exc:
                 log.warning("could not mark %s complete: %s", day, exc)
         return marked
+
+    def _write_status(self, adjusted, completions, warnings: List[str]) -> None:
+        """The dashboard's data file. Never fatal: a failure here costs a
+        phone screen, not the day's training."""
+        settings = self.config.raw.get("status") or {}
+        if not settings.get("enabled", True):
+            return
+        filename = settings.get("filename", "dashboard-status.json")
+        paths = [self.config.state_dir / filename]
+        for extra in settings.get("copy_to", []) or []:
+            paths.append(Path(str(extra)).expanduser() / filename)
+
+        try:
+            payload = build_status(
+                self.plan, self.state, self.today, adjusted, completions
+            )
+        except Exception as exc:
+            warnings.append(f"could not build the dashboard status: {exc}")
+            log.error("status build failed: %s", exc)
+            return
+
+        written = write_status(paths, payload)
+        if self.dry_run:
+            log.info("DRY RUN status would be written to %s",
+                     ", ".join(str(p) for p in paths))
+            return
+        if not written:
+            warnings.append("dashboard status could not be written anywhere")
+        else:
+            log.info("status written to %s", ", ".join(str(p) for p in written))
 
     def _calendar(self) -> Optional[CalendarMirror]:
         settings = self.config.calendar

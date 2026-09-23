@@ -60,7 +60,7 @@ core dependencies, runs the test suite and runs the scenarios:
 ~/NW-Personal-Brand/project/10k-automation/ops/setup.sh
 ```
 
-Expect 127 tests passing, then 13 scenarios and 0 failures. Nothing it installs
+Expect 157 tests passing, then 13 scenarios and 0 failures. Nothing it installs
 is compiled, and it needs no credentials.
 
 The Google Calendar libraries are a separate install, because they are the only
@@ -133,7 +133,7 @@ secret. When it is clean and the dry run looks right:
 | `python -m tenk.cli authorize` | One-time Whoop OAuth |
 | `ops/setup.sh` | Create the venv, install, test, scaffold config, report what is missing |
 | `python -m tenk.cli check` | Verify every connection and name anything missing |
-| `python -m unittest discover -s tests -t .` | The test suite (127 tests) |
+| `python -m unittest discover -s tests -t .` | The test suite (157 tests) |
 
 ## How the morning works
 
@@ -303,10 +303,11 @@ tenk/summary.py             Sunday Slack summary via the Ernest Ops relay
 tenk/engine.py              the morning run, start to finish
 tenk/selftest.py            13 scenarios against synthetic Whoop data
 tenk/doctor.py              the check command: verifies every connection
+tenk/status.py              the daily status file the mobile dashboard reads
 requirements.txt            core dependencies: PyYAML and requests, nothing compiled
 requirements-calendar.txt   the Google Calendar libraries, installed separately
 ops/setup.sh                one-shot setup and verification, run it from anywhere
 ops/                        launchd job, crontab, secrets template
 synthetic/                  synthetic Whoop payloads and their generator
-tests/                      125 tests, standard library only
+tests/                      157 tests, standard library only
 ```

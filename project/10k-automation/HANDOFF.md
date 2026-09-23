@@ -21,7 +21,7 @@ GitHub Actions run 35100569980 on commit `3bec9fc` passed all five jobs,
 including `macos-15-intel` with Python 3.9.25 — the same architecture and
 interpreter as this laptop. On that runner:
 
-- `ops/setup.sh` ran as documented: `Ran 127 tests`, `OK`, then
+- `ops/setup.sh` ran as documented: `Ran 157 tests`, `OK`, then
   `13 scenario(s) run, 0 failed`.
 - The same script ran again from an unrelated working directory and passed,
   confirming it locates itself.

@@ -214,8 +214,9 @@ class Completion:
     def pace_text(self) -> str:
         if self.distance_km <= 0:
             return "—"
-        seconds_per_km = self.moving_time_s / self.distance_km
-        return f"{int(seconds_per_km // 60)}:{int(round(seconds_per_km % 60)):02d}/km"
+        # Round before splitting, or 359.7 s/km renders as "5:60/km".
+        seconds_per_km = int(round(self.moving_time_s / self.distance_km))
+        return f"{seconds_per_km // 60}:{seconds_per_km % 60:02d}/km"
 
     def headline(self) -> str:
         bits = [f"{self.distance_km:.1f}km", self.pace_text]

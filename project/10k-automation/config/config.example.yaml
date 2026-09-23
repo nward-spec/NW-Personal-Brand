@@ -56,6 +56,21 @@ google_calendar:
   # Written into the event id so a re-run updates rather than duplicates.
   event_id_prefix: tenk
 
+# The daily status file the mobile dashboard reads. It is written to plain
+# folders, so whichever sync service you already use carries it to your phone
+# without this automation holding any credential of its own.
+status:
+  enabled: true
+  # Always written here, inside the repo's gitignored state directory.
+  filename: dashboard-status.json
+  # Extra destinations. Point one at a synced folder and the dashboard can
+  # read it. Leave the list empty to keep the file local only.
+  # Google Drive for desktop on macOS is usually:
+  #   /Users/<you>/Library/CloudStorage/GoogleDrive-<address>/My Drive/Training
+  # iCloud Drive is:
+  #   /Users/<you>/Library/Mobile Documents/com~apple~CloudDocs/Training
+  copy_to: []
+
 summary:
   # Sunday evening Slack summary, delivered through the Ernest Ops email relay.
   enabled: true

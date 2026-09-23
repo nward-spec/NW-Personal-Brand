@@ -140,6 +140,10 @@ class CalendarTests(unittest.TestCase):
         title = completion_title(day, [Completion(day.date, "Easy", 10.0, 3120, 147, "Run")])
         self.assertEqual(title, "✅ Tue — easy, 10.0km, 5:12/km, 147 avg HR")
 
+    def test_completion_pace_rounds_up_into_the_next_minute(self):
+        self.assertEqual(Completion(dt.date(2026, 9, 19), "R", 10.0, 3597, 150, "Run")
+                         .pace_text, "6:00/km")
+
     def test_completion_title_merges_a_double(self):
         day = self.plan.day_plan(dt.date(2026, 10, 27))
         runs = [
