@@ -8,9 +8,10 @@
   everyday behaviour.
 
   05:00 exists for Wednesday, so the session is on the watch before run club at
-  05:50. The later firings catch the recovery score whenever it lands. Every
-  run is idempotent: intervals.icu events upsert on their external id, and a
-  session already logged as completed is never rewritten.
+  05:50. It then retries every half hour to 08:00, and hourly to 10:00, which
+  is past the latest this athlete wakes. Every run is idempotent: intervals.icu
+  events upsert on their external id, and a session already logged as completed
+  is never rewritten.
 
   Times are local, so this follows Melbourne through the AEDT change on 4 Oct
   without any offset arithmetic.
@@ -31,10 +32,14 @@
     <key>StartCalendarInterval</key>
     <array>
         <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>30</integer></dict>
         <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
-        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
-        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/nick/NW-Personal-Brand/project/10k-automation</string>

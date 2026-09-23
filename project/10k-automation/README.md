@@ -234,10 +234,11 @@ engine says so in the day's notes.
 ## When it runs, and why more than once
 
 Whoop does not score a night until you wake, so a single 05:00 run usually
-finds no recovery and falls back to green. The job therefore fires at 05:00,
-06:30, 08:00, 09:30 and 11:00. The first exists for Wednesday, so the session
-reaches the watch before run club at 05:50; the rest catch the recovery score
-whenever it lands and rewrite the day with the right tier.
+finds no recovery and falls back to green. The job therefore fires nine times:
+05:00, then every half hour to 08:00, then 09:00 and 10:00. The first exists
+for Wednesday, so the session reaches the watch before run club at 05:50. The
+rest catch the recovery score whenever it lands and rewrite the day with the
+right tier. The last is 10:00, past the latest wake time this plan assumes.
 
 Running repeatedly is safe by construction:
 
@@ -249,7 +250,7 @@ Running repeatedly is safe by construction:
   07:00 and an amber score arrives at 09:30, the engine leaves the finished
   session exactly as you ran it.
 
-The Sunday summary is sent only on the last firing, so it arrives once.
+The Sunday summary is sent only on the 10:00 firing, so it arrives once.
 
 ## Logs and state
 

@@ -25,8 +25,14 @@ fi
 mkdir -p state
 "$PYTHON" -m tenk.cli run "$@" >> state/cron.log 2>&1
 
-# Sunday evening: the weekly summary goes to Slack through the Ernest Ops relay.
-# Only on the last firing of the day, so it is sent once.
-if [[ "$(date +%u)" == "7" && "$(date +%H)" -ge 11 && "${1:-}" != "--dry-run" ]]; then
+# Sunday: the weekly summary goes to Slack through the Ernest Ops relay, on the
+# last firing of the day only, so it is sent once.
+#
+# 10# forces base ten. Without it bash reads "08" and "09" as octal and the
+# comparison fails outright, which would have skipped the two morning firings
+# it guards.
+LAST_FIRING_HOUR=10
+HOUR=$((10#$(date +%H)))
+if [[ "$(date +%u)" == "7" && "$HOUR" -ge "$LAST_FIRING_HOUR" && "${1:-}" != "--dry-run" ]]; then
   "$PYTHON" -m tenk.cli summary >> state/cron.log 2>&1 || true
 fi
