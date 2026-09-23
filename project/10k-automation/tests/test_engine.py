@@ -62,6 +62,37 @@ class SelftestScenarioTests(unittest.TestCase):
         self.assertTrue(all(e.startswith("10k-w") for e in result["events"]))
 
 
+class DryRunTests(unittest.TestCase):
+    def test_a_dry_run_writes_no_status_file(self):
+        """--dry-run promises to execute no writes. A file is a write."""
+        import datetime as dt
+        import tempfile
+        from pathlib import Path
+        from tenk.config import Config
+        from tenk.engine import DailyEngine
+
+        root = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Config.from_mapping({
+                "plan_file": "config/plan.yaml",
+                "state_dir": tmp,
+                "engine": {"window_days": 2},
+                "whoop": {"enabled": False},
+                "intervals_icu": {"enabled": False, "athlete_id": "i1"},
+                "google_calendar": {"enabled": False},
+                "summary": {"enabled": False},
+                "status": {"enabled": True, "filename": "s.json",
+                           "copy_to": [str(Path(tmp) / "synced")]},
+            }, root=root)
+            DailyEngine(config, dry_run=True, today=dt.date(2026, 10, 31)).run()
+            self.assertFalse((Path(tmp) / "s.json").exists())
+            self.assertFalse((Path(tmp) / "synced" / "s.json").exists())
+
+            DailyEngine(config, dry_run=False, today=dt.date(2026, 10, 31)).run()
+            self.assertTrue((Path(tmp) / "s.json").exists())
+            self.assertTrue((Path(tmp) / "synced" / "s.json").exists())
+
+
 class WindowTests(unittest.TestCase):
     def test_window_never_writes_days_outside_the_block(self):
         scenario = next(s for s in SCENARIOS if s.name == "race-day-red")

@@ -338,11 +338,12 @@ class DailyEngine:
             log.error("status build failed: %s", exc)
             return
 
-        written = write_status(paths, payload)
         if self.dry_run:
             log.info("DRY RUN status would be written to %s",
                      ", ".join(str(p) for p in paths))
             return
+
+        written = write_status(paths, payload)
         if not written:
             warnings.append("dashboard status could not be written anywhere")
         else:
