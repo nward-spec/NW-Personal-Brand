@@ -328,6 +328,7 @@ tenk/status.py              the daily status file the mobile dashboard reads
 requirements.txt            core dependencies: PyYAML and requests, nothing compiled
 requirements-calendar.txt   the Google Calendar libraries, installed separately
 ops/setup.sh                one-shot setup and verification, run it from anywhere
+ops/install_schedule.sh     installs the morning schedule, validating before it registers
 ops/                        launchd job, crontab, secrets template
 synthetic/                  synthetic Whoop payloads and their generator
 tests/                      164 tests, standard library only

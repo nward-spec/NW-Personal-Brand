@@ -1,24 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  macOS launchd job.
+  macOS launchd job. Install it with ops/install_schedule.sh, which fills in
+  __PROJECT__, validates the result with plutil, and registers it. Do not copy
+  this file into ~/Library/LaunchAgents by hand.
 
-  It fires several times through the morning, not once, because Whoop does not
-  score a night until you wake. A 05:00 run alone would usually find no
-  recovery and fall back to green, which is the safe default but the wrong
-  everyday behaviour.
+  The DOCTYPE above is not decoration. launchd rejects a plist without it,
+  `launchctl load` reports that rejection silently, and the job then never
+  runs while still looking installed.
 
-  05:00 exists for Wednesday, so the session is on the watch before run club at
-  05:50. It then retries every half hour to 08:00, and hourly to 10:00, which
-  is past the latest this athlete wakes. Every run is idempotent: intervals.icu
-  events upsert on their external id, and a session already logged as completed
-  is never rewritten.
-
-  Times are local, so this follows Melbourne through the AEDT change on 4 Oct
-  without any offset arithmetic.
-
-    sed "s|/Users/nick/|$HOME/|g" ops/com.nickward.tenk.plist \
-      > ~/Library/LaunchAgents/com.nickward.tenk.plist
-    launchctl load ~/Library/LaunchAgents/com.nickward.tenk.plist
+  It fires nine times through the morning because Whoop does not score a night
+  until you wake. 05:00 is for Wednesday run club; the rest catch the recovery
+  score whenever it lands. Every run is idempotent, and a session already
+  logged as completed is never rewritten.
 -->
 <plist version="1.0">
 <dict>
@@ -27,7 +21,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/nick/NW-Personal-Brand/project/10k-automation/ops/run_daily.sh</string>
+        <string>__PROJECT__/ops/run_daily.sh</string>
     </array>
     <key>StartCalendarInterval</key>
     <array>
@@ -42,11 +36,11 @@
         <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/nick/NW-Personal-Brand/project/10k-automation</string>
+    <string>__PROJECT__</string>
     <key>StandardOutPath</key>
-    <string>/Users/nick/NW-Personal-Brand/project/10k-automation/state/launchd.out</string>
+    <string>__PROJECT__/state/launchd.out</string>
     <key>StandardErrorPath</key>
-    <string>/Users/nick/NW-Personal-Brand/project/10k-automation/state/launchd.err</string>
+    <string>__PROJECT__/state/launchd.err</string>
     <key>RunAtLoad</key>
     <false/>
 </dict>
