@@ -25,15 +25,17 @@ PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
 
 def day_entry(plan: Plan, date: dt.date) -> dict:
     day = plan.day_plan(date)
-    if day.gym is not None:
-        kind, name = "gym", day.gym.name.replace("Gym — ", "")
-    elif day.race_day:
+    if day.race_day:
         kind, name = "race", day.runs[0].workout.name
-    elif not day.runs:
-        kind, name = "rest", "Rest"
-    else:
+    elif day.runs:
+        # Gym can sit alongside a run from week 6. Leading with the gym hid
+        # the run, which made a 12km Wednesday read as a strength-only day.
         kind = day.runs[0].workout.kind
         name = " + ".join(r.workout.name for r in day.runs)
+    elif day.gym is not None:
+        kind, name = "gym", day.gym.name.replace("Gym — ", "")
+    else:
+        kind, name = "rest", "Rest"
     return {
         "date": date.isoformat(),
         "dow": day.label(),
@@ -42,6 +44,7 @@ def day_entry(plan: Plan, date: dt.date) -> dict:
         "name": name,
         "km": day.total_km or None,
         "double": len(day.runs) > 1,
+        "gym": day.gym.name.replace("Gym — ", "") if day.gym is not None else None,
         "keystone": day.keystone,
         "runs": [
             {"slot": r.slot, "name": r.workout.name, "km": round(r.km, 1),
@@ -61,8 +64,13 @@ def build() -> dict:
             "end": week.end.isoformat(),
             "target": week.volume_km,
             "planned": plan.allocate(week).planned_total,
-            "quality": (week.quality or {}).get("name", "").replace(
-                "GP", plan.goal_pace.human()),
+            # Weeks 6-10 carry two quality sessions, so this is a list.
+            "quality": [
+                {"day": weekday,
+                 "name": str(spec.get("name", "")).replace("GP", plan.goal_pace.human()),
+                 "keystone": bool(spec.get("keystone"))}
+                for weekday, spec in plan.quality_specs(week).items()
+            ],
             "long": plan.long_run_km(week) if not week.race_week else None,
             "keystone": week.keystone,
             "race_week": week.race_week,

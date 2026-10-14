@@ -120,14 +120,26 @@ def render_slack(plan: Plan, summary: WeekSummary, *, today: dt.date) -> str:
     next_week = next((w for w in plan.weeks if w.number == week.number + 1), None)
     if next_week is not None:
         lines.append("")
-        quality = next_week.quality.get("name", "quality session")
-        quality = quality.replace("GP", plan.goal_pace.human())
+        # A week can hold more than one quality session, and no longer always
+        # on Saturday, so name each one against its own day.
+        specs = plan.quality_specs(next_week)
+        sessions = ", ".join(
+            f"{weekday.capitalize()} {str(spec.get('name', 'quality session')).replace('GP', plan.goal_pace.human())}"
+            for weekday, spec in specs.items()
+        ) or "no quality session"
         lines.append(
             f"*Next up — week {next_week.number}:* {next_week.volume_km:.0f} km, "
-            f"Sat {quality}, Sun {next_week.long_run.get('km', 0):g} km."
+            f"{sessions}, Sun {next_week.long_run.get('km', 0):g} km."
         )
-        if next_week.keystone:
-            lines.append("That Saturday is the keystone. Everything else bends around it.")
+        keystone_day = next(
+            (d for d, s in specs.items() if s.get("keystone")),
+            "sat" if next_week.keystone else None,
+        )
+        if keystone_day:
+            lines.append(
+                f"That {keystone_day.capitalize()} is the keystone. "
+                f"Everything else bends around it."
+            )
     elif weeks_to_race == 0:
         lines.append("")
         lines.append("*Race week is done.* Go and run 37 minutes.")

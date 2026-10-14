@@ -136,8 +136,12 @@ def export() -> dict:
             "note": week.note,
             "keystone": week.keystone,
             "race_week": week.race_week,
-            "quality_name": (week.quality or {}).get("name", "").replace(
-                "GP", plan.goal_pace.human()),
+            "quality_sessions": [
+                {"day": weekday,
+                 "name": str(spec.get("name", "")).replace("GP", plan.goal_pace.human()),
+                 "keystone": bool(spec.get("keystone"))}
+                for weekday, spec in plan.quality_specs(week).items()
+            ],
             "long_run_km": plan.long_run_km(week) if not week.race_week else None,
             "allocation": allocation.day_km,
             "allocation_notes": allocation.notes,

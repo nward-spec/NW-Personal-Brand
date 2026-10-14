@@ -25,7 +25,9 @@ from .tiers import Tier, TierDecision
 from .whoop import WhoopWorkout
 from .workout import Repeat, Step, Workout
 
-GYM_DAYS = ("mon", "fri")
+# Fallback only. Callers that hold a Plan should pass plan.gym_days(),
+# because the gym days move between week 5 and week 6.
+GYM_DAYS = ("mon", "wed", "fri")
 
 
 @dataclass
@@ -74,11 +76,14 @@ class AdjustedDay:
 
 
 def summarise_day(day: DayPlan) -> str:
-    if day.gym is not None:
-        return day.gym.name
     if not day.runs:
-        return "Rest"
-    return " + ".join(f"{r.workout.name}" for r in day.runs)
+        return day.gym.name if day.gym is not None else "Rest"
+    # A day can carry both a run and a gym slot. Showing only the gym hid the
+    # run entirely, which made a 12km Wednesday look like a rest day.
+    summary = " + ".join(f"{r.workout.name}" for r in day.runs)
+    if day.gym is not None:
+        summary = f"{summary} + {day.gym.name.lower()}"
+    return summary
 
 
 def gym_strain_note(
@@ -88,9 +93,11 @@ def gym_strain_note(
     sport_names: Sequence[str] = (),
     baseline_sessions: int = 6,
     over_baseline_pct: float = 20.0,
+    gym_days: Sequence[str] = GYM_DAYS,
 ) -> Optional[str]:
     """Feed-forward flag after a heavy gym day. No structural change."""
-    if yesterday.strftime("%a").lower()[:3] not in GYM_DAYS:
+    gym_days = tuple(gym_days) or GYM_DAYS
+    if yesterday.strftime("%a").lower()[:3] not in gym_days:
         return None
     wanted = {name.lower() for name in sport_names}
 
@@ -100,7 +107,7 @@ def gym_strain_note(
         name = (workout.sport_name or "").lower()
         if not name:
             # Sport name missing: fall back to "any workout on a gym day".
-            return workout.date.strftime("%a").lower()[:3] in GYM_DAYS
+            return workout.date.strftime("%a").lower()[:3] in gym_days
         return any(w in name for w in wanted)
 
     gym_sessions = [w for w in workouts if is_gym(w) and w.strain is not None]
@@ -376,7 +383,11 @@ def apply_carry_forward(plan: Plan, day: DayPlan, state: RunState) -> Optional[s
             state.set_carry_forward(missed_date, None)
             continue
         if payload.get("kind") == "quality":
-            workout = plan.quality_workout(week)
+            # Take the spec from the day that was actually missed. A week can
+            # hold two different quality sessions, so week.quality is not
+            # enough to say which one was lost.
+            missed_spec = plan.day_spec(week, missed_date.strftime("%a").lower()[:3])
+            workout = plan.quality_workout(week, missed_spec.get("quality"))
         else:
             workout = plan.long_run_workout(week)
         workout.add_note(

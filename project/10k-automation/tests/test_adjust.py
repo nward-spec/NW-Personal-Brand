@@ -12,10 +12,14 @@ from tenk.workout import Repeat
 
 PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
 
-QUALITY_DAY = dt.date(2026, 10, 31)     # week 7 Saturday, 2 x 4km @ GP
-LONG_RUN_DAY = dt.date(2026, 11, 1)     # week 7 Sunday, 20km with progression
-DOUBLE_DAY = dt.date(2026, 10, 27)      # week 7 Tuesday, 23km as a double
-RUN_CLUB_DAY = dt.date(2026, 10, 28)
+# These anchor on real days in config/plan.yaml, so they move when the block
+# does. Weeks 6-10 run two quality sessions (Tue VO2, Fri threshold) in
+# singles, so doubles, progression finishes and run club now only exist in
+# weeks 1-5.
+QUALITY_DAY = dt.date(2026, 10, 30)     # week 7 Friday, 2 x 15min threshold
+LONG_RUN_DAY = dt.date(2026, 10, 4)     # week 3 Sunday, 18km with progression
+DOUBLE_DAY = dt.date(2026, 10, 15)      # week 5 Thursday, 19km as a double
+RUN_CLUB_DAY = dt.date(2026, 9, 30)     # week 3 Wednesday
 RACE_DAY = dt.date(2026, 11, 22)
 RACE_WEEK_DAY = dt.date(2026, 11, 17)
 
@@ -48,7 +52,7 @@ class GreenTests(EngineCase):
 
 class AmberTests(EngineCase):
     def test_reps_cut_by_a_quarter_rounded_down(self):
-        week5 = dt.date(2026, 10, 17)          # 4 x 1500m
+        week5 = dt.date(2026, 10, 17)          # 4 x 8min threshold
         result = self.apply(week5, Tier.AMBER)
         repeat = next(e for e in result.day.runs[0].workout.elements if isinstance(e, Repeat))
         self.assertEqual(repeat.reps, 3)
@@ -87,7 +91,7 @@ class RedTests(EngineCase):
 
     def test_long_run_cut_to_seventy_percent(self):
         result = self.apply(LONG_RUN_DAY, Tier.RED)
-        self.assertAlmostEqual(result.day.runs[0].km, 14.0, delta=0.2)
+        self.assertAlmostEqual(result.day.runs[0].km, 12.6, delta=0.2)   # 70% of 18
         self.assertNotIn("progression", result.day.runs[0].workout.name)
 
     def test_red_drops_the_pm_run(self):
@@ -112,8 +116,16 @@ class ImmunityTests(EngineCase):
         self.assertTrue(any("immune to AMBER" in n for n in result.day.notes))
 
     def test_race_week_still_responds_to_red(self):
-        result = self.apply(dt.date(2026, 11, 21), Tier.RED)   # race-week Saturday shakeout
-        self.assertTrue(any("Race week" not in n for n in result.day.notes))
+        """Only AMBER is ignored in race week. RED still acts.
+
+        This used to assert on the presence of an unrelated allocator note,
+        which made it pass for the wrong reason. The claim being tested is
+        that the same day is left alone on AMBER and changed on RED.
+        """
+        amber = self.apply(RACE_WEEK_DAY, Tier.AMBER)
+        red = self.apply(RACE_WEEK_DAY, Tier.RED)
+        self.assertFalse(amber.modified)
+        self.assertTrue(red.modified)
 
 
 class ConsecutiveRedTests(EngineCase):
@@ -148,7 +160,7 @@ class AlreadyRunTests(EngineCase):
             already_done=True,
         )
         self.assertFalse(result.modified)
-        self.assertEqual(result.day.runs[0].workout.name, "2 x 4km @ 3:40-3:45")
+        self.assertEqual(result.day.runs[0].workout.name, "2 x 15min threshold")
 
     def test_a_completed_long_run_is_not_cut_on_red(self):
         result = self.engine.apply(
@@ -156,7 +168,7 @@ class AlreadyRunTests(EngineCase):
             already_done=True,
         )
         self.assertFalse(result.modified)
-        self.assertAlmostEqual(result.day.runs[0].km, 20.0, delta=0.1)
+        self.assertAlmostEqual(result.day.runs[0].km, 18.0, delta=0.1)
 
     def test_it_says_why_it_left_the_day_alone(self):
         result = self.engine.apply(
@@ -222,7 +234,7 @@ class GymFeedForwardTests(unittest.TestCase):
         self.assertIsNone(gym_strain_note(self.workouts([10, 10, 10, 10, 11], yesterday), yesterday))
 
     def test_non_gym_day_is_ignored(self):
-        yesterday = dt.date(2026, 10, 27)      # Tuesday
+        yesterday = dt.date(2026, 10, 27)      # Tuesday, never a gym day
         self.assertIsNone(gym_strain_note(self.workouts([10, 10, 10, 10, 20], yesterday), yesterday))
 
     def test_thin_history_makes_no_claim(self):

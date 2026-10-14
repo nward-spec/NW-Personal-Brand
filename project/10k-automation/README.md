@@ -193,40 +193,68 @@ displaces is the volume that comes off.
 - **Two automatic modifications per plan week.** A third still fires, but every
   modification that week is flagged for review. Repeated downgrades mean the
   plan is wrong, not the athlete.
-- **Wednesday is never modified.** Run club cannot be prescribed. On a red
-  Wednesday the engine writes a note instead: *sit in the back group, cap Z3.*
+- **Wednesday is never modified.** This existed for run club, which was a
+  session the engine could not prescribe. Run club is dropped from week 6, but
+  the immunity stays: on a red Wednesday the engine writes a note instead of a
+  change. Harmless now that Wednesday is an easy day.
 - **Race week ignores AMBER.** Taper reliably produces poor recovery scores.
   Only red modifies anything, and never race day.
 - **Race day is never modified.**
 
 ### Gym feed-forward
 
-Monday and Friday gym strain is compared to a rolling gym-day baseline. More
-than 20% over, and the next day's session carries a note: *hold the HR cap hard,
-ignore pace entirely.* No structural change, just the flag.
+Gym-day strain is compared to a rolling gym-day baseline. More than 20% over,
+and the next day's session carries a note: *hold the HR cap hard, ignore pace
+entirely.* No structural change, just the flag.
 
-## Wednesday reconciliation
+Which days count comes from `plan.gym_days()`, not a constant: gym sat on
+Monday and Friday through week 5 and moves to Monday and Wednesday from week 6,
+because Friday became the key session.
 
-Run club is written to intervals.icu as a **duration placeholder** — no
-structure, no pace targets. Garmin syncs the completed run back, and Thursday
+## Two phases, one block
+
+The block changes shape at week 6.
+
+| | Weeks 1-5 | Weeks 6-10 |
+|---|---|---|
+| Key sessions | Saturday only | **Tuesday** (VO2) and **Friday** (threshold) |
+| Wednesday | run club, unprescribed | easy run + lower-body gym |
+| Friday | gym | the key session |
+| Gym | Mon, Fri | Mon (upper), Wed (lower) |
+| Volume | 58 → 80 km, with doubles | ~80 km, singles only |
+
+The reasoning for the second phase: with five weeks to the race, threshold and
+VO2 work still convert to fitness, while extra kilometres mostly do not. So the
+intensity went up and the volume held flat, in singles, rather than climbing to
+90 km in doubles.
+
+Two quality sessions mean the Sunday long run is **always easy** from week 6 —
+the progression finishes are gone. Three hard days in seven is how a block
+falls apart.
+
+### Volume reconciliation
+
+Run club (weeks 1-5) is written to intervals.icu as a **duration placeholder** —
+no structure, no pace targets. Garmin syncs the completed run back, and Thursday
 morning the engine reads what was actually run and rebalances the rest of the
-week to the volume target.
+week to the volume target. A short Wednesday is not a missed session.
 
-A short Wednesday is not a missed session. Being late and doing fewer reps than
-the group just moves kilometres to Thursday.
+The allocator pins the **structural** days — quality, the long run, run club, a
+race-week shakeout — which carry their own distance and never flex to chase a
+volume number. The easy days absorb the difference. Which day is which comes
+from the week template, not from hardcoded weekday names, so moving quality
+from Saturday to Tuesday and Friday needed no change to the allocator.
 
-The allocator pins Saturday quality and the Sunday long run: they are structural
-and never flex to chase a volume number. The easy days absorb the difference,
-Thursday first. If no easy day is left, the long run moves by up to 2 km and the
-engine says so in the day's notes.
+If no easy day is left, the long run moves by up to 2 km and the engine says so
+in the day's notes.
 
 ## Structural rules the engine will not break
 
-- Run days are Tuesday, Wednesday, Thursday, Saturday, Sunday. Never add or
-  remove a day.
+- Run days are Tuesday, Wednesday, Thursday, Saturday, Sunday, plus Friday from
+  week 6. Never add or remove a day.
 - No run under 5 km. A day stays a single run until it needs more than 12 km,
   then splits, and the second run is always Z1.
-- Long run capped at 20 km.
+- Long run capped at 20 km, and easy from week 6.
 - To cut volume, drop a double. Never drop a day.
 - Easy running is governed by heart rate; no pace target is ever written on an
   easy run. Quality is governed by pace; heart rate is a readout only.
@@ -236,7 +264,7 @@ engine says so in the day's notes.
 Whoop does not score a night until you wake, so a single 05:00 run usually
 finds no recovery and falls back to green. The job therefore fires nine times:
 05:00, then every half hour to 08:00, then 09:00 and 10:00. The first exists
-for Wednesday, so the session reaches the watch before run club at 05:50. The
+for an early Wednesday, so the session reaches the watch before you leave. The
 rest catch the recovery score whenever it lands and rewrite the day with the
 right tier. The last is 10:00, past the latest wake time this plan assumes.
 

@@ -51,6 +51,21 @@ paces:
     from: goal_pace
     offset_fast: 20
     offset_slow: 23
+    note: "Conservative band. Weeks 1-5 and any diagnostic session use this."
+  threshold_sharp:
+    from: goal_pace
+    offset_fast: 15
+    offset_slow: 20
+    note: >-
+      The Friday key session from week 6. At a 3:40-3:45 goal that is
+      3:55-4:05. The wider `threshold` band above sits closer to marathon
+      effort than to threshold for a sub-38 runner, which is fine for base
+      weeks and too soft for the key session of a race block.
+  vo2:
+    from: goal_pace
+    offset_fast: -10
+    offset_slow: -10
+    note: "3k effort. Short sharpeners only - nothing longer than 1min sits here."
   strides:
     from: goal_pace
     offset_fast: -25
@@ -72,7 +87,10 @@ paces:
 # Structural rules. The engine will not violate these.
 # ---------------------------------------------------------------------------
 rules:
-  run_days: [tue, wed, thu, sat, sun]
+  # Friday is a gym day in weeks 1-5 and the key-session day from week 6.
+  # Listing it here is safe either way: the allocator reads each day's kind
+  # from the template, so a Friday whose kind is `gym` is simply skipped.
+  run_days: [tue, wed, thu, fri, sat, sun]
   double_min_km: 5.0          # no run shorter than this, ever
   double_threshold_km: 12.0   # single run until the day needs more than this
   double_days: [tue, thu, sat] # never Wednesday (run club), never Sunday (long run)
@@ -162,6 +180,10 @@ weeks:
   - number: 5
     start: 2026-10-12
     volume_km: 80
+    note: >-
+      Transition week. Wednesday 14 Oct was run as 6 x 2min @ 3:45 off 45s
+      standing, so Saturday carries the long-interval work instead of the
+      planned 4 x 1500m. The two-session structure starts properly in week 6.
     quality:
       kind: intervals
       name: "4 x 1500m @ GP"
@@ -169,72 +191,193 @@ weeks:
       rep: { km: 1.5 }
       recovery: { seconds: 120 }
       pace: goal_pace
-    long_run: { km: 18, progression_km: 5 }
+    long_run: { km: 18 }
+    days:
+      sat:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "4 x 8min threshold"
+          reps: 4
+          rep: { minutes: 8 }
+          recovery: { seconds: 90 }
+          pace: threshold
+          note: >-
+            DIAGNOSTIC. Deliberately on the conservative `threshold` band, not
+            the sharper one used from week 6. Controlled and repeatable means
+            the engine is intact and 14 Oct was just a punishing session
+            design. Straining by rep 2 means the 37:00 goal needs revisiting.
 
+  # -------------------------------------------------------------------------
+  # Weeks 6-10: two key sessions a week, Tuesday and Friday.
+  #
+  #   Tuesday  - VO2 / speed. 5k-pace reps early, goal-pace reps late, as
+  #              specificity rises towards the race.
+  #   Friday   - THE key session. Long threshold intervals.
+  #   Sunday   - long run, easy throughout. Never a third hard day.
+  #
+  # Run club is dropped from week 6. Volume holds near 80 km in singles
+  # rather than climbing to 90 in doubles: with 5 weeks left, intensity
+  # still converts to fitness and extra kilometres mostly do not.
+  #
+  # Gym moves off Friday, which is now the key session. Monday keeps a
+  # run-free upper-body slot; lower body stacks onto Wednesday's easy run so
+  # it sits two clear days either side of a hard day.
+  # -------------------------------------------------------------------------
   - number: 6
     start: 2026-10-19
-    volume_km: 86
-    quality:
-      kind: intervals
-      name: "3 x 2.5km @ GP"
-      reps: 3
-      rep: { km: 2.5 }
-      recovery: { seconds: 150 }
-      pace: goal_pace
+    volume_km: 80
+    note: "First week of the two-session structure. Run club dropped."
     long_run: { km: 20 }
+    days:
+      mon: { kind: gym, focus: "Upper + core" }
+      tue:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "6 x 3min VO2"
+          reps: 6
+          rep: { minutes: 3 }
+          recovery: { seconds: 120 }
+          pace: five_k
+          note: "3min at 5k effort is the classic VO2 rep. Jog the recoveries."
+      wed: { kind: easy, strides: true, gym: "Lower body" }
+      thu: { kind: easy }
+      fri:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "3 x 10min threshold"
+          reps: 3
+          rep: { minutes: 10 }
+          recovery: { seconds: 120 }
+          pace: threshold_sharp
+          keystone: true
+          keystone_note: "KEY SESSION. 30min of threshold work. This is the week."
+      sat: { kind: easy }
+      sun: { kind: long_run }
 
   - number: 7
     start: 2026-10-26
-    volume_km: 90
-    note: "Peak week. The keystone session is Saturday."
+    volume_km: 80
+    note: "Longest reps of the block. Friday is the keystone."
     keystone: true
-    quality:
-      kind: intervals
-      name: "2 x 4km @ GP"
-      reps: 2
-      rep: { km: 4.0 }
-      recovery: { seconds: 240 }
-      pace: goal_pace
-      keystone: true
-    long_run: { km: 20, progression_km: 6 }
+    long_run: { km: 20 }
+    days:
+      mon: { kind: gym, focus: "Upper + core" }
+      tue:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "5 x 4min VO2"
+          reps: 5
+          rep: { minutes: 4 }
+          recovery: { seconds: 150 }
+          pace: five_k
+      wed: { kind: easy, strides: true, gym: "Lower body" }
+      thu: { kind: easy }
+      fri:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "2 x 15min threshold"
+          reps: 2
+          rep: { minutes: 15 }
+          recovery: { seconds: 180 }
+          pace: threshold_sharp
+          keystone: true
+          keystone_note: >-
+            KEYSTONE. 30min of threshold in two blocks. Hold the band through
+            the second rep and the race is there. Fading badly in rep 2 is the
+            honest signal to revise the goal, not to try harder next week.
+      sat: { kind: easy }
+      sun: { kind: long_run }
 
   - number: 8
     start: 2026-11-02
-    volume_km: 76
-    note: "Down week."
-    quality:
-      kind: intervals
-      name: "3 x 2km @ GP"
-      reps: 3
-      rep: { km: 2.0 }
-      recovery: { seconds: 120 }
-      pace: goal_pace
+    volume_km: 78
+    note: "Specificity rises: Tuesday moves to goal-pace reps."
     long_run: { km: 18 }
+    days:
+      mon: { kind: gym, focus: "Upper + core" }
+      tue:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "4 x 2km @ GP"
+          reps: 4
+          rep: { km: 2.0 }
+          recovery: { seconds: 120 }
+          pace: goal_pace
+          note: "8km at goal pace. The race rehearsal, broken into four."
+      wed: { kind: easy, strides: true, gym: "Lower body" }
+      thu: { kind: easy }
+      fri:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "4 x 8min threshold"
+          reps: 4
+          rep: { minutes: 8 }
+          recovery: { seconds: 90 }
+          pace: threshold_sharp
+          keystone: true
+          keystone_note: "KEY SESSION. 32min of threshold off short recoveries."
+      sat: { kind: easy }
+      sun: { kind: long_run }
 
   - number: 9
     start: 2026-11-09
-    volume_km: 68
-    quality:
-      kind: intervals
-      name: "2 x 3km @ GP"
-      reps: 2
-      rep: { km: 3.0 }
-      recovery: { seconds: 180 }
-      pace: goal_pace
+    volume_km: 70
+    note: "Taper begins. Intensity stays, volume comes down."
     long_run: { km: 16 }
+    days:
+      mon: { kind: gym, focus: "Upper + core" }
+      tue:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "3 x 2km @ GP"
+          reps: 3
+          rep: { km: 2.0 }
+          recovery: { seconds: 120 }
+          pace: goal_pace
+      wed: { kind: easy, strides: true }
+      thu: { kind: easy }
+      fri:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "2 x 10min threshold"
+          reps: 2
+          rep: { minutes: 10 }
+          recovery: { seconds: 120 }
+          pace: threshold_sharp
+          note: "Last threshold session. Cut back, not cut out. Do not add reps."
+      sat: { kind: easy }
+      sun: { kind: long_run }
 
   - number: 10
     start: 2026-11-16
-    volume_km: 42
+    volume_km: 36
     race_week: true
     note: "Race week. Taper reliably produces poor recovery scores - AMBER is ignored."
     # Race week is prescribed day by day. The volume allocator does not run.
     days:
-      tue: { kind: easy, km: 8.0 }
-      wed:
-        kind: run_club
-        estimate_km: 6.0
-        note: "CAPPED: 20min of work max, at goal pace, not faster. Do not race it."
+      mon: { kind: gym, focus: "Upper + core" }
+      tue:
+        kind: quality
+        quality:
+          kind: intervals
+          name: "6 x 1min sharpener"
+          reps: 6
+          rep: { minutes: 1 }
+          recovery: { seconds: 90 }
+          pace: five_k
+          note: >-
+            Sharpener, not a session. Six minutes of work total. The point is
+            to remind the legs what fast feels like, five days out.
+      wed: { kind: easy, km: 6.0, note: "Run club dropped from week 6 onward." }
       thu: { kind: easy, km: 6.0 }
       fri: { kind: rest, note: "No gym this week." }
       sat:

@@ -15,7 +15,11 @@ from tenk.summary import build_week_summary, render_slack
 from tenk.tiers import Baseline, Tier, TierDecision
 
 PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
-QUALITY_DAY = dt.date(2026, 10, 31)
+# Week 7 Friday: the keystone, 2 x 15min threshold. Doubles and run club
+# only exist in weeks 1-5 now, so those tests anchor there instead.
+QUALITY_DAY = dt.date(2026, 10, 30)
+DOUBLE_DAY = dt.date(2026, 10, 15)      # week 5 Thursday
+RUN_CLUB_DAY = dt.date(2026, 9, 30)     # week 3 Wednesday
 
 
 def green(day):
@@ -37,8 +41,8 @@ class EventTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_a_double_writes_two_events(self):
-        events = build_events(self.plan.day_plan(dt.date(2026, 10, 27)))
-        self.assertEqual([e.external_id for e in events], ["10k-w07-tue-am", "10k-w07-tue-pm"])
+        events = build_events(self.plan.day_plan(DOUBLE_DAY))
+        self.assertEqual([e.external_id for e in events], ["10k-w05-thu-am", "10k-w05-thu-pm"])
 
     def test_gym_day_writes_a_gym_event(self):
         events = build_events(self.plan.day_plan(dt.date(2026, 10, 26)))
@@ -50,7 +54,7 @@ class EventTests(unittest.TestCase):
 
     def test_quality_carries_pace_targets(self):
         event = build_events(self.plan.day_plan(QUALITY_DAY))[0]
-        self.assertIn("3:40/km-3:45/km Pace", event.payload["description"])
+        self.assertIn("3:55/km-4:05/km Pace", event.payload["description"])
 
     def test_easy_run_carries_a_heart_rate_ceiling_only(self):
         event = build_events(self.plan.day_plan(dt.date(2026, 9, 17)))[0]
@@ -59,7 +63,7 @@ class EventTests(unittest.TestCase):
         self.assertNotIn("Pace", body.replace("Strides", ""))
 
     def test_run_club_is_a_placeholder_with_no_structure(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 28))
+        day = self.plan.day_plan(RUN_CLUB_DAY)
         event = build_events(day)[0]
         self.assertTrue(day.runs[0].workout.placeholder)
         self.assertNotIn("Pace", event.payload["description"])
@@ -89,7 +93,7 @@ class CalendarTests(unittest.TestCase):
 
     def test_run_title_shape(self):
         title = build_title(self.plan.day_plan(QUALITY_DAY))
-        self.assertTrue(title.startswith("🏃 Sat — 2 x 4km @ 3:40-3:45"))
+        self.assertTrue(title.startswith("🏃 Fri — 2 x 15min threshold"), title)
         self.assertIn("(KEYSTONE)", title)
 
     def test_gym_title_shape(self):
@@ -111,7 +115,7 @@ class CalendarTests(unittest.TestCase):
         body = build_description(result)
         self.assertIn("Tier: AMBER", body)
         self.assertIn("Changed from the plan:", body)
-        self.assertIn("was: 2 x 4km @ 3:40-3:45", body)
+        self.assertIn("was: 2 x 15min threshold", body)
         self.assertIn("Recovery 48%", body)
         self.assertIn("baseline HRV 60.0 ms", body)
 
@@ -145,7 +149,7 @@ class CalendarTests(unittest.TestCase):
                          .pace_text, "6:00/km")
 
     def test_completion_title_merges_a_double(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 27))
+        day = self.plan.day_plan(DOUBLE_DAY)
         runs = [
             Completion(day.date, "AM", 12.0, 3720, 148, "Run"),
             Completion(day.date, "PM", 11.0, 3630, 138, "Run"),

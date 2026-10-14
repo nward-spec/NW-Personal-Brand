@@ -144,6 +144,7 @@ class DailyEngine:
                 sport_names=gym_settings.get("sport_names", []),
                 baseline_sessions=int(gym_settings.get("baseline_sessions", 6)),
                 over_baseline_pct=float(gym_settings.get("strain_over_baseline_pct", 20)),
+                gym_days=self.plan.gym_days(),
             )
         except WhoopError as exc:
             warnings.append(f"Whoop workouts unavailable ({exc}); no gym feed-forward this morning.")

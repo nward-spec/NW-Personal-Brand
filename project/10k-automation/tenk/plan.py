@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import yaml
 
@@ -174,13 +174,24 @@ class Plan:
 
     # ------------------------------------------------------------- allocation
 
+    def day_spec(self, week: Week, weekday: str) -> Dict[str, Any]:
+        """The week template for a weekday, overlaid with that week's override."""
+        spec = dict(self.week_template.get(weekday, {}))
+        spec.update(week.days.get(weekday, {}) or {})
+        return spec
+
     def allocate(self, week: Week, actuals: Optional[Mapping[str, float]] = None) -> WeekAllocation:
         """Distribute the week's volume across its run days.
 
         Days in `actuals` are pinned to what was actually run; everything else
-        is allocated. Saturday quality and the Sunday long run are structural
-        and never flex to chase volume - the easy days absorb the difference,
-        Thursday first. That is the Wednesday reconciliation in one function.
+        is allocated. Structural days - quality, the long run, run club, a
+        shakeout - carry their own distance and never flex to chase volume.
+        The easy days absorb the difference. That is the midweek
+        reconciliation in one function.
+
+        Which day is which comes from the week template, not from hardcoded
+        weekday names, so a block can put quality on Tuesday and Friday and
+        the allocator follows.
         """
         actuals = dict(actuals or {})
         notes: List[str] = []
@@ -195,6 +206,8 @@ class Plan:
                     km = spec.get("estimate_km", self._run_club_defaults().get("estimate_km", 10.0))
                 if km is None and spec.get("kind") == "shakeout":
                     km = self._shakeout_km(spec)
+                if km is None and spec.get("kind") == "quality":
+                    km = self.quality_workout(week, spec.get("quality")).est_km()
                 if km is None and spec.get("kind") == "race":
                     km = float(self.meta["race"]["distance_km"]) + float(spec.get("warmup_km", 0))
                 if km is not None:
@@ -211,11 +224,21 @@ class Plan:
             return WeekAllocation(day_km, total, week.volume_km, notes)
 
         fixed: Dict[str, float] = {}
-        fixed["sat"] = self.quality_workout(week).est_km()
-        fixed["sun"] = self.long_run_km(week)
-        fixed["wed"] = float(actuals.get("wed", self._run_club_defaults().get("estimate_km", 10.0)))
-
-        flexible = [d for d in ("tue", "thu") if d in run_days]
+        flexible: List[str] = []
+        for weekday in run_days:
+            spec = self.day_spec(week, weekday)
+            kind = spec.get("kind", "rest")
+            if kind == "quality":
+                fixed[weekday] = self.quality_workout(week, spec.get("quality")).est_km()
+            elif kind == "long_run":
+                fixed[weekday] = self.long_run_km(week)
+            elif kind == "run_club":
+                estimate = spec.get("estimate_km", self._run_club_defaults().get("estimate_km", 10.0))
+                fixed[weekday] = float(actuals.get(weekday, estimate))
+            elif kind == "shakeout":
+                fixed[weekday] = self._shakeout_km(spec)
+            elif kind == "easy":
+                flexible.append(weekday)
         pinned_flex = {d: float(actuals[d]) for d in flexible if d in actuals}
         for day, km in actuals.items():
             if day in fixed:
@@ -274,8 +297,7 @@ class Plan:
             return DayPlan(date=day, weekday=weekday, week_number=0, rest=True,
                            notes=["Outside the plan block."])
 
-        spec = dict(self.week_template.get(weekday, {}))
-        spec.update(week.days.get(weekday, {}) or {})
+        spec = self.day_spec(week, weekday)
         kind = spec.get("kind", "rest")
 
         plan_day = DayPlan(
@@ -292,9 +314,14 @@ class Plan:
 
         if kind == "gym":
             focus = spec.get("focus") or self.defaults.get("gym", {}).get(weekday, "Strength")
-            plan_day.gym = Workout(kind="gym", name=f"Gym — {focus.lower()}", sport="gym",
-                                   elements=[], notes=["No running."])
+            plan_day.gym = self._gym_workout(focus, running=False)
             return plan_day
+        # A run day may also carry a gym slot. Stacking strength onto a day
+        # that is already hard beats spending a whole day on it, which is the
+        # only way to fit two quality sessions and two gym sessions into
+        # seven days.
+        if spec.get("gym"):
+            plan_day.gym = self._gym_workout(str(spec["gym"]), running=True)
         if kind == "rest":
             plan_day.rest = True
             return plan_day
@@ -303,11 +330,20 @@ class Plan:
         km = allocation.day_km.get(weekday, 0.0)
 
         if kind == "quality":
-            workout = self.quality_workout(week)
-            plan_day.keystone = bool(week.quality.get("keystone") or week.keystone)
+            quality_spec = spec.get("quality")
+            workout = self.quality_workout(week, quality_spec)
+            source = quality_spec or week.quality or {}
+            # week.keystone marks the week, not the day. It only promotes a
+            # day when that week has a single quality session; otherwise the
+            # day's own spec decides, or every session in week 7 would be
+            # labelled the keystone.
+            single_session = len(self.quality_specs(week)) <= 1
+            plan_day.keystone = bool(
+                source.get("keystone") or (week.keystone and single_session)
+            )
             plan_day.runs.append(Run("am", workout, workout.est_km()))
             extra = round(km - workout.est_km(), 1)
-            if extra >= float(self.rule("double_min_km", 5.0)) and "sat" in self.rule("double_days", []):
+            if extra >= float(self.rule("double_min_km", 5.0)) and weekday in self.rule("double_days", []):
                 plan_day.runs.append(self._easy_run("pm", extra, zone="Z1"))
         elif kind == "long_run":
             workout = self.long_run_workout(week)
@@ -331,8 +367,57 @@ class Plan:
 
     # ------------------------------------------------------------- components
 
-    def quality_workout(self, week: Week) -> Workout:
-        spec = week.quality or {}
+    def gym_days(self) -> List[str]:
+        """Every weekday that carries a gym slot anywhere in the block.
+
+        Gym sat on Monday and Friday in weeks 1-5 and moves to Monday and
+        Wednesday from week 6, so this cannot be a constant.
+        """
+        days: List[str] = []
+        for week in self.weeks:
+            for weekday in WEEKDAYS:
+                if weekday in days:
+                    continue
+                spec = self.day_spec(week, weekday)
+                if spec.get("kind") == "gym" or spec.get("gym"):
+                    days.append(weekday)
+        return [d for d in WEEKDAYS if d in days]
+
+    def quality_specs(self, week: Week) -> Dict[str, Dict[str, Any]]:
+        """Every quality session in a week, keyed by weekday, in week order.
+
+        Weeks 1-5 carry one session in `week.quality`; weeks 6-10 carry one
+        `quality:` block per quality day. Callers that want to name or render
+        a week's key sessions should use this rather than `week.quality`,
+        which only ever holds the first shape.
+        """
+        found: Dict[str, Dict[str, Any]] = {}
+        for weekday in WEEKDAYS:
+            spec = self.day_spec(week, weekday)
+            if spec.get("kind") != "quality":
+                continue
+            found[weekday] = dict(spec.get("quality") or week.quality or {})
+        return found
+
+    def _gym_workout(self, focus: str, *, running: bool) -> Workout:
+        """A strength slot. `running` says whether the day also carries a run."""
+        notes = ["Stacked onto a running day: run first, lift second."] if running \
+            else ["No running."]
+        return Workout(kind="gym", name=f"Gym — {focus.lower()}", sport="gym",
+                       elements=[], notes=notes)
+
+    def quality_workout(self, week: Week, spec: Optional[Mapping[str, Any]] = None) -> Workout:
+        """The week's quality session, or a specific one when `spec` is given.
+
+        A week with two quality days carries a `quality:` block on each day;
+        `week.quality` remains the single-session fallback.
+        """
+        spec = dict(spec) if spec else (week.quality or {})
+        if not spec:
+            raise ValueError(
+                f"week {week.number} has no quality session: give the week a "
+                f"`quality:` block, or the day a `quality:` block under `days:`"
+            )
         kind = spec.get("kind", "intervals")
         warmup = float(self.defaults.get("quality_warmup_km", 3.0))
         cooldown = float(self.defaults.get("quality_cooldown_km", 2.0))
@@ -394,9 +479,12 @@ class Plan:
             ],
         )
         if spec.get("keystone"):
-            workout.add_note(
-                "KEYSTONE. 8km at goal pace with one break. Execute it and the race is there."
-            )
+            # The session that defines the week. Its wording belongs to the
+            # session, not to this function - a threshold keystone and a
+            # goal-pace keystone say different things.
+            workout.add_note(spec.get("keystone_note") or "KEYSTONE. The session the week is built around.")
+        if spec.get("note"):
+            workout.add_note(str(spec["note"]))
         workout.add_note("Pace is the target. Heart rate is a readout only.")
         return workout
 

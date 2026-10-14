@@ -19,12 +19,17 @@ class SelftestScenarioTests(unittest.TestCase):
 
     def test_green_writes_the_session_as_planned(self):
         result = self.result("green")
-        self.assertEqual(result["today"], "2 x 4km @ 3:40-3:45")
+        self.assertEqual(result["today"], "2 x 15min threshold")
         self.assertEqual(result["modifications"], [])
 
     def test_amber_cuts_reps_only(self):
         result = self.result("amber-quality")
-        self.assertIn("3:40-3:45", result["today"])
+        self.assertIn("threshold", result["today"])
+        self.assertTrue(result["modifications"])
+
+    def test_amber_on_the_vo2_session_cuts_reps_only(self):
+        result = self.result("vo2-amber")
+        self.assertIn("VO2", result["today"])
         self.assertTrue(result["modifications"])
 
     def test_red_replaces_quality_with_easy(self):

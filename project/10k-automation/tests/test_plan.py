@@ -20,16 +20,26 @@ class PlanShapeTests(unittest.TestCase):
         for week in self.plan.weeks:
             self.assertEqual(week.start.weekday(), 0, week.number)
 
-    def test_run_days_never_change(self):
+    def test_run_days_match_the_phase_of_the_block(self):
+        """Weeks 1-5 run Tue/Wed/Thu/Sat/Sun; weeks 6-9 add Friday.
+
+        Friday is a gym day up to week 5 and the key session from week 6, so
+        "the run days never change" stopped being true at week 6.
+        """
         for week in self.plan.weeks:
             for offset in range(7):
                 day = week.start + dt.timedelta(days=offset)
                 plan_day = self.plan.day_plan(day)
                 weekday = plan_day.weekday
-                if weekday in ("mon",):
+                if weekday == "mon":
                     self.assertFalse(plan_day.runs, f"{day} should be a gym day")
                 if weekday in ("tue", "wed", "thu", "sat", "sun"):
                     self.assertTrue(plan_day.runs, f"{day} must be a run day")
+                if weekday == "fri":
+                    if 6 <= week.number <= 9:
+                        self.assertTrue(plan_day.runs, f"{day} is the key session")
+                    else:
+                        self.assertFalse(plan_day.runs, f"{day} is gym or rest")
 
     def test_long_run_never_exceeds_the_cap(self):
         for week in self.plan.weeks[:-1]:
@@ -38,10 +48,11 @@ class PlanShapeTests(unittest.TestCase):
     def test_nothing_under_a_kilometre_after_week_four(self):
         """The block is deliberately weighted to long reps."""
         for week in self.plan.weeks[4:]:
-            spec = week.quality or {}
-            rep = spec.get("rep") or {}
-            if "km" in rep:
-                self.assertGreaterEqual(float(rep["km"]), 1.0, f"week {week.number}")
+            for weekday, spec in self.plan.quality_specs(week).items():
+                rep = spec.get("rep") or {}
+                if "km" in rep:
+                    self.assertGreaterEqual(
+                        float(rep["km"]), 1.0, f"week {week.number} {weekday}")
 
 
 class AllocationTests(unittest.TestCase):
@@ -63,7 +74,10 @@ class AllocationTests(unittest.TestCase):
     def test_every_run_day_is_present_in_every_week(self):
         for number in range(1, 10):
             allocation = self.plan.allocate(self.week(number))
-            self.assertEqual(set(allocation.day_km), {"tue", "wed", "thu", "sat", "sun"})
+            expected = {"tue", "wed", "thu", "sat", "sun"}
+            if 6 <= number <= 9:
+                expected.add("fri")        # the key session day
+            self.assertEqual(set(allocation.day_km), expected, f"week {number}")
             for day, km in allocation.day_km.items():
                 self.assertGreaterEqual(km, 5.0, f"week {number} {day}")
 
@@ -81,11 +95,16 @@ class AllocationTests(unittest.TestCase):
         self.assertLess(long_wed.day_km["thu"], planned.day_km["thu"])
 
     def test_quality_and_long_run_never_flex_for_volume(self):
+        """Structural days carry their own distance. Easy days absorb the rest.
+
+        In weeks 6-9 the structural days are Tuesday, Friday and Sunday.
+        """
         week = self.week(7)
         planned = self.plan.allocate(week)
-        rebalanced = self.plan.allocate(week, {"tue": 18.0, "wed": 6.0})
-        self.assertEqual(planned.day_km["sat"], rebalanced.day_km["sat"])
-        self.assertEqual(planned.day_km["sun"], rebalanced.day_km["sun"])
+        rebalanced = self.plan.allocate(week, {"wed": 6.0})
+        for structural in ("tue", "fri", "sun"):
+            self.assertEqual(
+                planned.day_km[structural], rebalanced.day_km[structural], structural)
 
 
 class DoubleTests(unittest.TestCase):
@@ -97,14 +116,14 @@ class DoubleTests(unittest.TestCase):
         self.assertEqual(len(day.runs), 1)
 
     def test_big_day_splits_with_both_runs_over_the_minimum(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 27))  # week 7 Tuesday, 23 km
+        day = self.plan.day_plan(dt.date(2026, 10, 15))  # week 5 Thursday, 19 km
         self.assertEqual(len(day.runs), 2)
         for run in day.runs:
             self.assertGreaterEqual(run.km, 5.0)
         self.assertEqual(day.runs[1].slot, "pm")
 
     def test_second_run_is_z1(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 27))
+        day = self.plan.day_plan(dt.date(2026, 10, 15))
         text = day.runs[1].workout.icu_text()
         self.assertIn("Z1 HR", text)
 
@@ -133,9 +152,11 @@ class RaceWeekTests(unittest.TestCase):
         self.assertEqual(day.runs[0].workout.kind, "shakeout")
         self.assertIn("strides", day.runs[0].workout.name)
 
-    def test_run_club_is_capped_in_race_week(self):
+    def test_race_week_wednesday_is_a_short_easy_run(self):
+        """Run club is dropped from week 6, so race-week Wednesday is just easy."""
         day = self.plan.day_plan(dt.date(2026, 11, 18))
-        self.assertIn("CAPPED", " ".join(day.notes) + " ".join(day.runs[0].workout.notes))
+        self.assertEqual(day.runs[0].workout.kind, "easy")
+        self.assertLessEqual(day.runs[0].km, 6.0)
 
 
 class QualityTests(unittest.TestCase):
@@ -143,16 +164,30 @@ class QualityTests(unittest.TestCase):
         self.plan = Plan.load(PLAN_FILE)
 
     def test_goal_pace_is_expanded_in_session_names(self):
-        week = next(w for w in self.plan.weeks if w.number == 7)
-        workout = self.plan.quality_workout(week)
-        self.assertEqual(workout.name, "2 x 4km @ 3:40-3:45")
+        week = next(w for w in self.plan.weeks if w.number == 8)
+        workout = self.plan.quality_workout(week, self.plan.quality_specs(week)["tue"])
+        self.assertEqual(workout.name, "4 x 2km @ 3:40-3:45")
         self.assertNotIn("GP", workout.name)
 
-    def test_keystone_session_is_eight_kilometres_at_goal_pace(self):
-        week = next(w for w in self.plan.weeks if w.number == 7)
-        workout = self.plan.quality_workout(week)
+    def test_the_week_eight_tuesday_is_eight_kilometres_at_goal_pace(self):
+        week = next(w for w in self.plan.weeks if w.number == 8)
+        workout = self.plan.quality_workout(week, self.plan.quality_specs(week)["tue"])
         repeat = workout.elements[1]
         self.assertEqual(repeat.reps * repeat.steps[0].km, 8.0)
+
+    def test_the_keystone_is_thirty_minutes_of_threshold(self):
+        week = next(w for w in self.plan.weeks if w.number == 7)
+        specs = self.plan.quality_specs(week)
+        self.assertTrue(specs["fri"].get("keystone"), "Friday is the keystone")
+        workout = self.plan.quality_workout(week, specs["fri"])
+        repeat = workout.elements[1]
+        self.assertEqual(repeat.reps * repeat.steps[0].seconds / 60, 30.0)
+        self.assertIn("3:55/km-4:05/km Pace", workout.icu_text())
+
+    def test_every_week_from_six_has_two_quality_sessions(self):
+        for week in self.plan.weeks[5:9]:
+            specs = self.plan.quality_specs(week)
+            self.assertEqual(list(specs), ["tue", "fri"], f"week {week.number}")
 
     def test_week_four_is_a_time_trial(self):
         week = next(w for w in self.plan.weeks if w.number == 4)
@@ -167,7 +202,7 @@ class QualityTests(unittest.TestCase):
         self.assertIn("Z2 HR", text)
 
     def test_long_run_progression_uses_the_progression_band(self):
-        week = next(w for w in self.plan.weeks if w.number == 7)
+        week = next(w for w in self.plan.weeks if w.number == 3)
         workout = self.plan.long_run_workout(week)
         self.assertIn("4:05/km-4:15/km Pace", workout.icu_text())
 

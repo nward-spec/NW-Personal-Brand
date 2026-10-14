@@ -14,7 +14,7 @@ from tenk.status import build_status, write_status
 from tenk.tiers import Baseline, Tier, TierDecision
 
 PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
-TODAY = dt.date(2026, 10, 31)
+TODAY = dt.date(2026, 10, 30)      # week 7 Friday, the keystone threshold session
 
 
 def decision(tier, **kw):
@@ -45,7 +45,7 @@ class BuildTests(StatusCase):
         detail = payload["today_detail"]
         self.assertEqual(detail["tier"], "AMBER")
         self.assertTrue(detail["modified"])
-        self.assertEqual(detail["prescribed"], "2 x 4km @ 3:40-3:45")
+        self.assertEqual(detail["prescribed"], "2 x 15min threshold")
         self.assertEqual(detail["recovery"], 48)
         self.assertEqual(detail["hrv"], 55.2)
         self.assertEqual(detail["hrv_baseline"], 60.0)
@@ -58,11 +58,11 @@ class BuildTests(StatusCase):
         self.assertEqual(edit["date"], TODAY.isoformat())
         self.assertEqual(edit["tier"], "AMBER")
         self.assertIn("reps", edit["summary"])
-        self.assertEqual(edit["was"], "2 x 4km @ 3:40-3:45")
+        self.assertEqual(edit["was"], "2 x 15min threshold")
         self.assertTrue(edit["why"])
 
     def test_edits_are_newest_first(self):
-        self.adjusted(day=dt.date(2026, 10, 27))
+        self.adjusted(day=dt.date(2026, 10, 27))   # week 7 Tuesday VO2
         self.adjusted(day=TODAY)
         payload = build_status(self.plan, self.state, TODAY, None, {})
         dates = [e["date"] for e in payload["edits"]]
