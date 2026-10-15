@@ -81,18 +81,26 @@ class AllocationTests(unittest.TestCase):
             for day, km in allocation.day_km.items():
                 self.assertGreaterEqual(km, 5.0, f"week {number} {day}")
 
-    def test_wednesday_reconciliation_moves_volume_to_thursday(self):
+    def test_a_short_midweek_run_moves_volume_to_the_other_easy_day(self):
+        """Thursday is pinned for basketball, so Saturday is what flexes now."""
         week = self.week(7)
         planned = self.plan.allocate(week)
-        short = self.plan.allocate(week, {"tue": planned.day_km["tue"], "wed": 6.0})
-        self.assertGreater(short.day_km["thu"], planned.day_km["thu"])
+        short = self.plan.allocate(week, {"wed": 6.0})
+        self.assertGreater(short.day_km["sat"], planned.day_km["sat"])
         self.assertEqual(short.day_km["wed"], 6.0)
+        self.assertEqual(short.day_km["thu"], planned.day_km["thu"])
 
-    def test_a_long_wednesday_takes_volume_off_thursday(self):
+    def test_a_long_midweek_run_takes_volume_off_the_other_easy_day(self):
         week = self.week(7)
         planned = self.plan.allocate(week)
-        long_wed = self.plan.allocate(week, {"tue": planned.day_km["tue"], "wed": 14.0})
-        self.assertLess(long_wed.day_km["thu"], planned.day_km["thu"])
+        long_wed = self.plan.allocate(week, {"wed": 18.0})
+        self.assertLess(long_wed.day_km["sat"], planned.day_km["sat"])
+
+    def test_a_pinned_easy_day_never_absorbs_volume(self):
+        """Thursday is capped at 6km because basketball is that evening."""
+        week = self.week(7)
+        for actuals in ({}, {"wed": 6.0}, {"wed": 18.0}):
+            self.assertEqual(self.plan.allocate(week, actuals).day_km["thu"], 6.0)
 
     def test_quality_and_long_run_never_flex_for_volume(self):
         """Structural days carry their own distance. Easy days absorb the rest.
@@ -116,14 +124,14 @@ class DoubleTests(unittest.TestCase):
         self.assertEqual(len(day.runs), 1)
 
     def test_big_day_splits_with_both_runs_over_the_minimum(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 15))  # week 5 Thursday, 19 km
+        day = self.plan.day_plan(dt.date(2026, 10, 13))  # week 5 Tuesday, 19 km
         self.assertEqual(len(day.runs), 2)
         for run in day.runs:
             self.assertGreaterEqual(run.km, 5.0)
         self.assertEqual(day.runs[1].slot, "pm")
 
     def test_second_run_is_z1(self):
-        day = self.plan.day_plan(dt.date(2026, 10, 15))
+        day = self.plan.day_plan(dt.date(2026, 10, 13))
         text = day.runs[1].workout.icu_text()
         self.assertIn("Z1 HR", text)
 

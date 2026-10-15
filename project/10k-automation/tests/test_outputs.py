@@ -18,7 +18,7 @@ PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
 # Week 7 Friday: the keystone, 2 x 15min threshold. Doubles and run club
 # only exist in weeks 1-5 now, so those tests anchor there instead.
 QUALITY_DAY = dt.date(2026, 10, 30)
-DOUBLE_DAY = dt.date(2026, 10, 15)      # week 5 Thursday
+DOUBLE_DAY = dt.date(2026, 10, 13)      # week 5 Tuesday
 RUN_CLUB_DAY = dt.date(2026, 9, 30)     # week 3 Wednesday
 
 
@@ -42,7 +42,7 @@ class EventTests(unittest.TestCase):
 
     def test_a_double_writes_two_events(self):
         events = build_events(self.plan.day_plan(DOUBLE_DAY))
-        self.assertEqual([e.external_id for e in events], ["10k-w05-thu-am", "10k-w05-thu-pm"])
+        self.assertEqual([e.external_id for e in events], ["10k-w05-tue-am", "10k-w05-tue-pm"])
 
     def test_gym_day_writes_a_gym_event(self):
         events = build_events(self.plan.day_plan(dt.date(2026, 10, 26)))

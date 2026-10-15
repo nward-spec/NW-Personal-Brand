@@ -18,7 +18,7 @@ PLAN_FILE = Path(__file__).resolve().parent.parent / "config" / "plan.yaml"
 # weeks 1-5.
 QUALITY_DAY = dt.date(2026, 10, 30)     # week 7 Friday, 2 x 15min threshold
 LONG_RUN_DAY = dt.date(2026, 10, 4)     # week 3 Sunday, 18km with progression
-DOUBLE_DAY = dt.date(2026, 10, 15)      # week 5 Thursday, 19km as a double
+DOUBLE_DAY = dt.date(2026, 10, 13)      # week 5 Tuesday, 19km as a double
 RUN_CLUB_DAY = dt.date(2026, 9, 30)     # week 3 Wednesday
 RACE_DAY = dt.date(2026, 11, 22)
 RACE_WEEK_DAY = dt.date(2026, 11, 17)

@@ -179,7 +179,10 @@ weeks:
 
   - number: 5
     start: 2026-10-12
-    volume_km: 80
+    # 73, not 80: Thursday's PM recovery run went to basketball. This records
+    # the week as it was actually run rather than leaving the allocator to
+    # push the difference onto a Tuesday that has already happened.
+    volume_km: 73
     note: >-
       Transition week. Wednesday 14 Oct was run as 6 x 2min @ 3:45 off 45s
       standing, so Saturday carries the long-interval work instead of the
@@ -193,6 +196,12 @@ weeks:
       pace: goal_pace
     long_run: { km: 18 }
     days:
+      thu:
+        kind: easy
+        km: 12.0
+        note: >-
+          15 Oct: the 7km PM recovery run was dropped for basketball. Thursday
+          night basketball is a standing commitment from here.
       sat:
         kind: quality
         quality:
@@ -242,7 +251,13 @@ weeks:
           pace: five_k
           note: "3min at 5k effort is the classic VO2 rep. Jog the recoveries."
       wed: { kind: easy, strides: true, gym: "Lower body" }
-      thu: { kind: easy }
+      thu:
+        kind: easy
+        km: 6.0
+        note: >-
+          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
+          the key session and this is the day before it, so the volume
+          this day would have carried sits on Wednesday and Saturday.
       fri:
         kind: quality
         quality:
@@ -275,7 +290,13 @@ weeks:
           recovery: { seconds: 150 }
           pace: five_k
       wed: { kind: easy, strides: true, gym: "Lower body" }
-      thu: { kind: easy }
+      thu:
+        kind: easy
+        km: 6.0
+        note: >-
+          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
+          the key session and this is the day before it, so the volume
+          this day would have carried sits on Wednesday and Saturday.
       fri:
         kind: quality
         quality:
@@ -311,7 +332,13 @@ weeks:
           pace: goal_pace
           note: "8km at goal pace. The race rehearsal, broken into four."
       wed: { kind: easy, strides: true, gym: "Lower body" }
-      thu: { kind: easy }
+      thu:
+        kind: easy
+        km: 6.0
+        note: >-
+          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
+          the key session and this is the day before it, so the volume
+          this day would have carried sits on Wednesday and Saturday.
       fri:
         kind: quality
         quality:
@@ -343,7 +370,13 @@ weeks:
           recovery: { seconds: 120 }
           pace: goal_pace
       wed: { kind: easy, strides: true }
-      thu: { kind: easy }
+      thu:
+        kind: easy
+        km: 6.0
+        note: >-
+          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
+          the key session and this is the day before it, so the volume
+          this day would have carried sits on Wednesday and Saturday.
       fri:
         kind: quality
         quality:
@@ -378,7 +411,10 @@ weeks:
             Sharpener, not a session. Six minutes of work total. The point is
             to remind the legs what fast feels like, five days out.
       wed: { kind: easy, km: 6.0, note: "Run club dropped from week 6 onward." }
-      thu: { kind: easy, km: 6.0 }
+      thu:
+        kind: easy
+        km: 6.0
+        note: "BASKETBALL: three days before the race. Decide in advance."
       fri: { kind: rest, note: "No gym this week." }
       sat:
         kind: shakeout

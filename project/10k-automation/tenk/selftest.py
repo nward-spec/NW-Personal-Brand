@@ -51,7 +51,7 @@ SCENARIOS: List[Scenario] = [
              "Red on the key session: same duration, all of it easy Z2."),
     Scenario("red-long-run", dt.date(2026, 10, 4), (25, 47, 53),
              "Red on a progression long run: 70% of the distance, progression dropped."),
-    Scenario("amber-double", dt.date(2026, 10, 15), (45, 57, 47),
+    Scenario("amber-double", dt.date(2026, 10, 13), (45, 57, 47),
              "Amber on a double day: the PM run goes, the day stays."),
     Scenario("double-red", dt.date(2026, 10, 30), (22, 44, 54),
              "Second red in a row: full rest, session carried forward, loud flag.",

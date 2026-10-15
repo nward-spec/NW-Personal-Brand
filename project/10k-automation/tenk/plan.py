@@ -238,7 +238,14 @@ class Plan:
             elif kind == "shakeout":
                 fixed[weekday] = self._shakeout_km(spec)
             elif kind == "easy":
-                flexible.append(weekday)
+                if spec.get("km") is not None:
+                    # An easy day with an explicit distance is a commitment,
+                    # not slack. Thursday is capped because basketball is that
+                    # evening, so the volume it would have absorbed has to land
+                    # on the other easy days instead of silently inflating it.
+                    fixed[weekday] = float(spec["km"])
+                else:
+                    flexible.append(weekday)
         pinned_flex = {d: float(actuals[d]) for d in flexible if d in actuals}
         for day, km in actuals.items():
             if day in fixed:
