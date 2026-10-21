@@ -159,6 +159,42 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("(x2)", title)
 
 
+class EventListTests(unittest.TestCase):
+    """An unanswerable query must not look like an empty calendar."""
+
+    class FakeResponse:
+        def __init__(self, body, status=200):
+            self.status_code = status; self._body = body; self.text = str(body)
+        def json(self):
+            if isinstance(self._body, ValueError): raise self._body
+            return self._body
+
+    def client(self, body, status=200):
+        from tenk.intervals_icu import IntervalsClient
+        c = IntervalsClient(athlete_id="i12345", api_key="k")
+        c.session.get = lambda *a, **k: EventListTests.FakeResponse(body, status)
+        return c
+
+    def test_a_list_is_returned_as_is(self):
+        got = self.client([{"id": 1}, {"id": 2}]).events(
+            dt.date(2026, 10, 1), dt.date(2026, 12, 1))
+        self.assertEqual(len(got), 2)
+
+    def test_an_empty_list_is_a_real_empty_calendar(self):
+        self.assertEqual(self.client([]).events(
+            dt.date(2026, 10, 1), dt.date(2026, 12, 1)), [])
+
+    def test_a_non_list_body_raises_instead_of_reading_as_empty(self):
+        with self.assertRaises(RuntimeError):
+            self.client({"error": "range too wide"}).events(
+                dt.date(2026, 10, 1), dt.date(2027, 12, 1))
+
+    def test_unparseable_json_raises_too(self):
+        with self.assertRaises(RuntimeError):
+            self.client(ValueError("not json")).events(
+                dt.date(2026, 10, 1), dt.date(2026, 12, 1))
+
+
 class UpsertReportingTests(unittest.TestCase):
     """A write is only as written as the server says it is."""
 

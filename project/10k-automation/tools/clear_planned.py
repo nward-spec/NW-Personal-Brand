@@ -47,14 +47,29 @@ def main(argv=None) -> int:
         api_base=settings.get("api_base", "https://intervals.icu/api/v1"),
     )
 
+    from tenk.plan import Plan
+    plan = Plan.load(config.plan_file)
+
     start = dt.date.fromisoformat(args.start) if args.start else dt.date.today()
-    end = dt.date.fromisoformat(args.end) if args.end else start + dt.timedelta(days=400)
+    # Bounded by race day rather than an arbitrary year ahead. A 400-day
+    # range came back as something other than a list, which the client used
+    # to swallow as an empty calendar.
+    end = dt.date.fromisoformat(args.end) if args.end else plan.race_date
 
     events = client.events(start, end)
     ours = [
         e for e in events
         if str(e.get("external_id") or "").startswith(prefix + "-")
     ]
+    if events and not ours:
+        # The list endpoint may omit external_id. Say so instead of reporting
+        # an empty result as though the calendar were clean.
+        has_field = any("external_id" in e for e in events)
+        print(f"{len(events)} events found, none carrying an '{prefix}-' external_id.")
+        if not has_field:
+            print("The events list does not include external_id at all, so this "
+                  "tool cannot tell which events are ours. Nothing deleted.")
+        return 1
     # Newest first: if the run is interrupted, the days closest to today -
     # the ones the watch actually needs - are the last to go.
     ours.sort(key=lambda e: str(e.get("start_date_local") or ""), reverse=True)
