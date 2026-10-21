@@ -211,11 +211,8 @@ class IntervalsClient:
             )
         body = _safe_json(response)
         if not isinstance(body, list):
-            # Returning [] here read as "no events on the calendar", which is
-            # indistinguishable from a request the server would not answer -
-            # a date range it rejects, say. Say which it is.
             raise RuntimeError(
-                f"intervals.icu returned no event list for {oldest}..{newest} "
+                f"intervals.icu returned no activity list for {oldest}..{newest} "
                 f"({response.status_code}): {str(body)[:200]}"
             )
         return body
@@ -252,7 +249,15 @@ class IntervalsClient:
                 f"intervals.icu events failed ({response.status_code}): {response.text[:300]}"
             )
         body = _safe_json(response)
-        return body if isinstance(body, list) else []
+        if not isinstance(body, list):
+            # Returning [] here read as "nothing on the calendar", which is
+            # indistinguishable from a request the server would not answer -
+            # a date range it rejects, say. Say which it is.
+            raise RuntimeError(
+                f"intervals.icu returned no event list for {oldest}..{newest} "
+                f"({response.status_code}): {str(body)[:200]}"
+            )
+        return body
 
 
 @dataclass
