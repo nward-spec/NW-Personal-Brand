@@ -143,8 +143,30 @@ class IntervalsClient:
             raise RuntimeError(
                 f"intervals.icu bulk upsert failed ({response.status_code}): {response.text[:400]}"
             )
-        log.info("intervals.icu: wrote %d events", len(payload))
-        return {"written": len(payload), "response": _safe_json(response)}
+        # Report what the server created, not what we posted. Counting the
+        # request made every push look like a success: a 200 with an empty
+        # body read as "wrote 35 events" while the calendar stayed empty,
+        # and nothing downstream could tell the difference.
+        body = _safe_json(response)
+        confirmed = len(body) if isinstance(body, list) else None
+        if confirmed is None:
+            log.warning(
+                "intervals.icu accepted %d events but returned no list to confirm "
+                "them; treating the write as unconfirmed", len(payload)
+            )
+        elif confirmed != len(payload):
+            log.warning(
+                "intervals.icu: sent %d events, server confirmed %d",
+                len(payload), confirmed
+            )
+        else:
+            log.info("intervals.icu: wrote %d events", confirmed)
+        return {
+            "written": confirmed or 0,
+            "sent": len(payload),
+            "confirmed": confirmed,
+            "response": body,
+        }
 
     def athlete(self) -> Mapping[str, Any]:
         """GET /athlete/{id} — the cheapest way to prove the key and id are right."""

@@ -159,6 +159,47 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("(x2)", title)
 
 
+class UpsertReportingTests(unittest.TestCase):
+    """A write is only as written as the server says it is."""
+
+    class FakeResponse:
+        def __init__(self, body): self.status_code = 200; self._body = body; self.text = "ok"
+        def json(self): return self._body
+
+    def client(self, body):
+        from tenk.intervals_icu import IntervalsClient
+        c = IntervalsClient(athlete_id="i12345", api_key="k")
+        c.session.post = lambda *a, **k: UpsertReportingTests.FakeResponse(body)
+        return c
+
+    def events(self, n):
+        day = self.plan.day_plan(dt.date(2026, 10, 30))
+        return build_events(day)[:1] * n
+
+    def setUp(self):
+        self.plan = Plan.load(PLAN_FILE)
+
+    def test_an_empty_response_is_not_counted_as_written(self):
+        result = self.client([]).bulk_upsert(self.events(3))
+        self.assertEqual(result["written"], 0)
+        self.assertEqual(result["sent"], 3)
+
+    def test_a_confirmed_response_counts_what_the_server_returned(self):
+        result = self.client([{"id": 1}, {"id": 2}]).bulk_upsert(self.events(2))
+        self.assertEqual(result["written"], 2)
+        self.assertEqual(result["confirmed"], 2)
+
+    def test_a_short_response_reports_the_shortfall(self):
+        result = self.client([{"id": 1}]).bulk_upsert(self.events(3))
+        self.assertEqual(result["written"], 1)
+        self.assertEqual(result["sent"], 3)
+
+    def test_a_non_list_body_leaves_the_write_unconfirmed(self):
+        result = self.client({"ok": True}).bulk_upsert(self.events(2))
+        self.assertIsNone(result["confirmed"])
+        self.assertEqual(result["written"], 0)
+
+
 class DeleteEventTests(unittest.TestCase):
     """Deleting is not on the daily path, so it must report what happened."""
 

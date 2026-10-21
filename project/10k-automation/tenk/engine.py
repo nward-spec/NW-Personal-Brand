@@ -275,6 +275,13 @@ class DailyEngine:
             try:
                 result = intervals.bulk_upsert(events)
                 report.events_written = result.get("written", 0) or result.get("would_write", 0)
+                sent, confirmed = result.get("sent"), result.get("confirmed")
+                if sent and confirmed != sent and not result.get("dry_run"):
+                    warnings.append(
+                        f"intervals.icu accepted {sent} events but confirmed "
+                        f"{confirmed if confirmed is not None else 'none'}; "
+                        f"the calendar may not hold what this run intended"
+                    )
             except Exception as exc:
                 warnings.append(f"intervals.icu write failed: {exc}")
                 log.error("intervals.icu write failed: %s", exc)
