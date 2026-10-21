@@ -159,6 +159,29 @@ class CalendarTests(unittest.TestCase):
         self.assertIn("(x2)", title)
 
 
+class DeleteEventTests(unittest.TestCase):
+    """Deleting is not on the daily path, so it must report what happened."""
+
+    class FakeResponse:
+        def __init__(self, status): self.status_code = status; self.text = "body"
+
+    def client(self, status):
+        from tenk.intervals_icu import IntervalsClient
+        c = IntervalsClient(athlete_id="i12345", api_key="k")
+        c.session.delete = lambda *a, **k: DeleteEventTests.FakeResponse(status)
+        return c
+
+    def test_a_deleted_event_reports_true(self):
+        self.assertTrue(self.client(200).delete_event(1))
+
+    def test_an_already_missing_event_is_not_an_error(self):
+        self.assertFalse(self.client(404).delete_event(1))
+
+    def test_a_refusal_raises_rather_than_looping_silently(self):
+        with self.assertRaises(RuntimeError):
+            self.client(403).delete_event(1)
+
+
 class CompletionParsingTests(unittest.TestCase):
     def test_groups_by_local_date_and_converts_metres(self):
         grouped = completions_by_date([

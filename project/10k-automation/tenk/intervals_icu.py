@@ -190,6 +190,27 @@ class IntervalsClient:
         body = _safe_json(response)
         return body if isinstance(body, list) else []
 
+    def delete_event(self, event_id: Any) -> bool:
+        """DELETE one calendar event. True if it is gone, False if it was not there.
+
+        The delete path is not exercised by the daily job, so it reports what
+        the server actually said rather than assuming success: a 404 means
+        someone removed it already, and anything else is raised so a bulk
+        caller stops instead of looping through 35 silent failures.
+        """
+        response = self.session.delete(
+            f"{self.api_base}/athlete/{self.athlete_id}/events/{event_id}",
+            timeout=self.timeout,
+        )
+        if response.status_code == 404:
+            return False
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"intervals.icu refused to delete event {event_id} "
+                f"({response.status_code}): {response.text[:200]}"
+            )
+        return True
+
     def events(self, oldest: dt.date, newest: dt.date) -> List[Mapping[str, Any]]:
         response = self.session.get(
             self._url("events"),
