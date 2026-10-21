@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import yaml
 
@@ -69,6 +69,27 @@ class Config:
     @property
     def decision_log(self) -> Path:
         return self.state_dir / "decisions.jsonl"
+
+    @property
+    def status_enabled(self) -> bool:
+        return bool((self.raw.get("status") or {}).get("enabled", True))
+
+    @property
+    def status_paths(self) -> List[Path]:
+        """Every place the dashboard status file is written.
+
+        The first is inside the state directory; the rest are sync folders.
+        The engine writes these and `tenk check` reads them back to say how
+        old they are, so both must resolve the same list - a status file that
+        is fresh locally and three weeks old in the synced folder is a real
+        and otherwise invisible fault.
+        """
+        settings = self.raw.get("status") or {}
+        filename = settings.get("filename", "dashboard-status.json")
+        paths = [self.state_dir / filename]
+        for extra in settings.get("copy_to", []) or []:
+            paths.append(Path(str(extra)).expanduser() / filename)
+        return paths
 
     @property
     def outbox(self) -> Path:

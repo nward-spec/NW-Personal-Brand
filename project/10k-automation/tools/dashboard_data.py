@@ -46,6 +46,10 @@ def day_entry(plan: Plan, date: dt.date) -> dict:
         "double": len(day.runs) > 1,
         "gym": day.gym.name.replace("Gym — ", "") if day.gym is not None else None,
         "keystone": day.keystone,
+        # Standing commitments and day-specific warnings live here, which is
+        # how the dashboard learns about Thursday basketball at all: it is a
+        # fixture in the week, not a session the engine prescribes.
+        "notes": list(day.notes),
         "runs": [
             {"slot": r.slot, "name": r.workout.name, "km": round(r.km, 1),
              "min": round(r.workout.est_seconds() / 60)}

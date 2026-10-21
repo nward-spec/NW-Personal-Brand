@@ -1,6 +1,7 @@
 """The check command must name the real problem, and never print a secret."""
 
 import datetime as dt
+import json
 import os
 import tempfile
 import unittest
@@ -57,6 +58,81 @@ class FakeWhoop:
 
 def find(checks, name):
     return next(c for c in checks if c.name == name)
+
+
+class FreshnessTests(unittest.TestCase):
+    """A stale status file is the only evidence the scheduled job has stopped."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+
+    def write_status(self, hours_ago, *, directory=None, body=None):
+        stamp = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours_ago)
+        target = (directory or self.state) / "dashboard-status.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = body if body is not None else {
+            "schema": 1, "generated": stamp.isoformat(timespec="seconds"),
+        }
+        target.write_text(json.dumps(payload), encoding="utf-8")
+        return target
+
+    def checks(self, **overrides):
+        # Exercises the one check, rather than adding a test-only entry point
+        # to Doctor just to avoid the network calls the others make.
+        doctor = Doctor(config(self.state, **overrides), today=TODAY)
+        doctor._check_freshness()
+        return doctor.checks
+
+    def test_a_recent_file_is_ok(self):
+        self.write_status(3)
+        self.assertEqual(find(self.checks(), "freshness").status, OK)
+
+    def test_one_missed_morning_only_warns(self):
+        self.write_status(40)
+        check = find(self.checks(), "freshness")
+        self.assertEqual(check.status, WARN)
+        self.assertIn("asleep", check.fix)
+
+    def test_a_job_that_stopped_fails_and_says_how_to_look(self):
+        self.write_status(24 * 20)
+        check = find(self.checks(), "freshness")
+        self.assertEqual(check.status, FAIL)
+        self.assertIn("20 days", check.detail)
+        self.assertIn("launchctl print", check.fix)
+
+    def test_a_missing_file_is_named_not_ignored(self):
+        check = find(self.checks(), "freshness")
+        self.assertEqual(check.status, WARN)
+        self.assertIn("never written", check.fix)
+
+    def test_an_unparseable_timestamp_does_not_crash(self):
+        self.write_status(1, body={"schema": 1, "generated": "not-a-date"})
+        self.assertEqual(find(self.checks(), "freshness").status, WARN)
+
+    def test_a_missing_generated_key_does_not_crash(self):
+        self.write_status(1, body={"schema": 1})
+        self.assertEqual(find(self.checks(), "freshness").status, WARN)
+
+    def test_a_naive_timestamp_is_treated_as_utc(self):
+        stale = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=20))
+        self.write_status(1, body={"schema": 1,
+                                   "generated": stale.replace(tzinfo=None).isoformat()})
+        self.assertEqual(find(self.checks(), "freshness").status, FAIL)
+
+    def test_a_stale_sync_copy_is_reported_separately(self):
+        """Fresh locally, stale in the synced folder: the phone sees nothing."""
+        synced = self.state / "Training"
+        self.write_status(2)
+        self.write_status(24 * 20, directory=synced)
+        checks = self.checks(status={"enabled": True, "copy_to": [str(synced)]})
+        self.assertEqual(find(checks, "freshness").status, OK)
+        self.assertEqual(find(checks, "freshness: Training").status, FAIL)
+
+    def test_disabled_status_is_skipped_not_failed(self):
+        checks = self.checks(status={"enabled": False})
+        self.assertEqual(find(checks, "freshness").status, SKIP)
 
 
 class OfflineTests(unittest.TestCase):

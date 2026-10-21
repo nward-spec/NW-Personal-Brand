@@ -248,6 +248,32 @@ from Saturday to Tuesday and Friday needed no change to the allocator.
 If no easy day is left, the long run moves by up to 2 km and the engine says so
 in the day's notes.
 
+## Knowing it has stopped
+
+Every failure in this project so far has been a silent one. The worst was the
+schedule: the plist was missing its DOCTYPE, `launchctl load` reported the
+rejection to nobody, and the job sat installed and dead for eight days while
+`tenk check` read ok on every line. It happened again afterwards and ran for
+three weeks with nothing written.
+
+Nothing in the system announces that. launchd calls a calendar job that never
+fires "not running", which is also what a healthy one looks like between
+firings. The engine logs nothing, because it never starts. The dashboard keeps
+serving the last day it was given.
+
+The one piece of evidence is the status file's own `generated` timestamp, so
+both ends read it back:
+
+- `tenk check` has a **freshness** line per status destination - the copy in
+  `state/` and every synced folder in `status.copy_to`. Under 36 hours is ok,
+  up to 4 days warns, past that it fails and prints the `launchctl print`
+  command. A fresh local file beside a three-week-old synced one is a real
+  fault and used to be invisible.
+- The **dashboard** says how old its data is in words, and past four days it
+  turns red and stops implying the quiet feed means quiet training.
+
+Neither detects the job dying. They make it impossible not to notice.
+
 ## Structural rules the engine will not break
 
 - Run days are Tuesday, Wednesday, Thursday, Saturday, Sunday, plus Friday from

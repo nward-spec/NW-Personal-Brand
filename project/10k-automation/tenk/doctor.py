@@ -8,6 +8,7 @@ line with the fix attached. It reads credentials but never prints them.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 from dataclasses import dataclass
 from typing import Callable, List, Optional
@@ -64,6 +65,7 @@ class Doctor:
         self._check_whoop()
         self._check_calendar()
         self._check_state()
+        self._check_freshness()
         if plan is not None:
             self._check_today(plan)
         return self.checks
@@ -222,6 +224,70 @@ class Doctor:
                      "The engine needs it for tokens, logs and the decision trail.")
             return
         self.add("state", OK, f"writable at {directory}")
+
+    # A stale status file is the only evidence that the scheduled job has
+    # stopped. Nothing else announces it: launchd reports a calendar job that
+    # never fires as simply "not running", the engine logs nothing because it
+    # never starts, and the dashboard keeps serving its last good day. This
+    # block once sat broken for three weeks while every other check read ok.
+    STALE_WARN_HOURS = 36
+    STALE_FAIL_HOURS = 96
+
+    def _check_freshness(self) -> None:
+        if not self.config.status_enabled:
+            self.add("freshness", SKIP, "status file disabled in config")
+            return
+
+        now = dt.datetime.now(dt.timezone.utc)
+        for path in self.config.status_paths:
+            label = "freshness" if path == self.config.status_paths[0] else f"freshness: {path.parent.name}"
+
+            if not path.exists():
+                self.add(label, WARN, f"no status file at {path}",
+                         "The engine has never written here. Run `tenk run` once.")
+                continue
+
+            generated = self._generated_at(path)
+            if generated is None:
+                self.add(label, WARN, f"{path} has no readable 'generated' timestamp",
+                         "Delete it and run `tenk run` to rewrite it.")
+                continue
+
+            hours = (now - generated).total_seconds() / 3600.0
+            age = self._age_text(hours)
+            if hours >= self.STALE_FAIL_HOURS:
+                self.add(label, FAIL, f"last written {age} ago ({generated:%a %d %b %H:%M} UTC)",
+                         "The scheduled job is not running. Check it with: "
+                         "launchctl print gui/$(id -u)/com.nickward.tenk")
+            elif hours >= self.STALE_WARN_HOURS:
+                self.add(label, WARN, f"last written {age} ago",
+                         "One missed morning is normal if the Mac was asleep. "
+                         "Two is worth checking.")
+            else:
+                self.add(label, OK, f"written {age} ago")
+
+    @staticmethod
+    def _generated_at(path) -> Optional[dt.datetime]:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            stamp = str(payload["generated"])
+        except Exception:
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(stamp)
+        except ValueError:
+            return None
+        # Written with a UTC offset, but treat a naive value as UTC rather
+        # than crashing on the subtraction.
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+
+    @staticmethod
+    def _age_text(hours: float) -> str:
+        if hours < 1:
+            return f"{int(round(hours * 60))} min"
+        if hours < 48:
+            return f"{hours:.0f} hours"
+        return f"{hours / 24:.0f} days"
 
     def _check_today(self, plan: Plan) -> None:
         day = plan.day_plan(self.today)

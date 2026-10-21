@@ -327,13 +327,9 @@ class DailyEngine:
     def _write_status(self, adjusted, completions, warnings: List[str]) -> None:
         """The dashboard's data file. Never fatal: a failure here costs a
         phone screen, not the day's training."""
-        settings = self.config.raw.get("status") or {}
-        if not settings.get("enabled", True):
+        if not self.config.status_enabled:
             return
-        filename = settings.get("filename", "dashboard-status.json")
-        paths = [self.config.state_dir / filename]
-        for extra in settings.get("copy_to", []) or []:
-            paths.append(Path(str(extra)).expanduser() / filename)
+        paths = self.config.status_paths
 
         try:
             payload = build_status(
