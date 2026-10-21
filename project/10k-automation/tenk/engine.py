@@ -156,9 +156,12 @@ class DailyEngine:
         settings = self.config.intervals
         if not settings.get("enabled", True):
             return None
+        # `auth_via_proxy: true` means the credential lives in the egress
+        # proxy and never reaches this process, so there is no key to read.
+        proxy_auth = bool(settings.get("auth_via_proxy", False))
         return IntervalsClient(
             athlete_id=str(settings.get("athlete_id", "")),
-            api_key=Config.secret("INTERVALS_ICU_API_KEY"),
+            api_key=None if proxy_auth else Config.secret("INTERVALS_ICU_API_KEY"),
             api_base=settings.get("api_base", "https://intervals.icu/api/v1"),
             dry_run=self.dry_run,
         )

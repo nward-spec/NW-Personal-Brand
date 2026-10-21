@@ -60,6 +60,42 @@ def find(checks, name):
     return next(c for c in checks if c.name == name)
 
 
+class ProxyAuthTests(unittest.TestCase):
+    """The credential can live in the egress proxy instead of this process."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+
+    def test_the_client_sets_no_auth_header_without_a_key(self):
+        from tenk.intervals_icu import IntervalsClient
+        client = IntervalsClient(athlete_id="i12345", api_key=None)
+        self.assertIsNone(client.session.auth)
+
+    def test_the_client_still_authenticates_when_given_a_key(self):
+        from tenk.intervals_icu import IntervalsClient
+        client = IntervalsClient(athlete_id="i12345", api_key="abc123")
+        self.assertEqual(client.session.auth, ("API_KEY", "abc123"))
+
+    def test_proxy_auth_does_not_demand_the_key(self):
+        cfg = config(self.state, intervals_icu={
+            "enabled": True, "athlete_id": "i12345", "auth_via_proxy": True})
+        with mock.patch.dict(os.environ, {"INTERVALS_ICU_API_KEY": ""}, clear=False):
+            doctor = Doctor(cfg, today=TODAY, intervals_factory=lambda: FakeIntervals())
+            doctor._check_intervals()
+        statuses = [c.status for c in doctor.checks if c.name == "intervals.icu"]
+        self.assertNotIn(FAIL, statuses)
+
+    def test_without_proxy_auth_a_missing_key_still_fails(self):
+        cfg = config(self.state, intervals_icu={
+            "enabled": True, "athlete_id": "i12345"})
+        with mock.patch.dict(os.environ, {"INTERVALS_ICU_API_KEY": ""}, clear=False):
+            doctor = Doctor(cfg, today=TODAY)
+            doctor._check_intervals()
+        self.assertEqual(find(doctor.checks, "intervals.icu").status, FAIL)
+
+
 class FreshnessTests(unittest.TestCase):
     """A stale status file is the only evidence the scheduled job has stopped."""
 

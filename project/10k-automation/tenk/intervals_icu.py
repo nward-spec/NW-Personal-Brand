@@ -106,7 +106,7 @@ class IntervalsClient:
         self,
         *,
         athlete_id: str,
-        api_key: str,
+        api_key: Optional[str] = None,
         api_base: str = "https://intervals.icu/api/v1",
         session: Optional[requests.Session] = None,
         timeout: float = 30.0,
@@ -115,7 +115,12 @@ class IntervalsClient:
         self.athlete_id = athlete_id
         self.api_base = api_base.rstrip("/")
         self.session = session or requests.Session()
-        self.session.auth = ("API_KEY", api_key)
+        # With no key, the Authorization header is expected to be added
+        # upstream - by an egress proxy holding the credential, so that the
+        # key is never readable by this process. Setting our own auth here
+        # would override whatever the proxy attaches, so we leave it alone.
+        if api_key:
+            self.session.auth = ("API_KEY", api_key)
         self.timeout = timeout
         self.dry_run = dry_run
 

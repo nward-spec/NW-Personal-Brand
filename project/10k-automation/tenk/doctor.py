@@ -99,12 +99,17 @@ class Doctor:
                      "intervals.icu URL when you are logged in.")
             return
 
-        try:
-            Config.secret("INTERVALS_ICU_API_KEY")
-        except ConfigError:
-            self.add("intervals.icu", FAIL, "INTERVALS_ICU_API_KEY is not set",
-                     "Put it in ops/secrets.env, then: source ops/secrets.env")
-            return
+        if settings.get("auth_via_proxy", False):
+            # The credential is held by the egress proxy and is deliberately
+            # unreadable here, so there is nothing to check but the call.
+            self.add("intervals.icu", OK, "auth is injected by the egress proxy")
+        else:
+            try:
+                Config.secret("INTERVALS_ICU_API_KEY")
+            except ConfigError:
+                self.add("intervals.icu", FAIL, "INTERVALS_ICU_API_KEY is not set",
+                         "Put it in ops/secrets.env, then: source ops/secrets.env")
+                return
 
         if self.intervals_factory is None:
             self.add("intervals.icu", SKIP, "credentials present, connection not tested")
