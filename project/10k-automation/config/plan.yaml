@@ -19,8 +19,8 @@ meta:
     location: "St Kilda foreshore"
     date: 2026-11-22
     distance_km: 10
-    goal: "37:00 primary, 36:30 stretch"
-  pb_10k: "38:0x"
+    goal: "38:00"
+  pb_10k: "38:19"
 
 # Heart-rate zones, already set on the Forerunner 965.
 # Easy running is governed by HR. Quality is governed by pace; HR is a readout.
@@ -41,8 +41,13 @@ zones:
 # ---------------------------------------------------------------------------
 paces:
   goal_pace:
-    range: "3:40-3:45"
-    note: "Provisional until the week 4 parkrun. Edit this line, nothing else."
+    range: "3:46-3:50"
+    note: >-
+      38:00 is 3:48/km, so the band brackets it. Set from six weeks of Whoop
+      workout history on 22 Oct: 36 km a week on average over five complete
+      weeks, range 26-52, longest run 18.5 km. The previous 3:40-3:45 was a
+      37:00 target written before any of that was known. Everything below
+      derives from this line.
   five_k:
     from: goal_pace
     offset_fast: -5
@@ -131,6 +136,8 @@ week_template:
 # ---------------------------------------------------------------------------
 weeks:
   - number: 1
+
+
     start: 2026-09-14
     volume_km: 58
     quality:
@@ -143,6 +150,8 @@ weeks:
     long_run: { km: 14 }
 
   - number: 2
+
+
     start: 2026-09-21
     volume_km: 65
     quality:
@@ -155,6 +164,8 @@ weeks:
     long_run: { km: 16 }
 
   - number: 3
+
+
     start: 2026-09-28
     volume_km: 72
     quality:
@@ -167,6 +178,8 @@ weeks:
     long_run: { km: 18, progression_km: 4 }
 
   - number: 4
+
+
     start: 2026-10-05
     volume_km: 62
     note: "Down week. AEDT starts 4 Oct. parkrun time trial recalibrates goal pace."
@@ -178,6 +191,8 @@ weeks:
     long_run: { km: 16 }
 
   - number: 5
+
+
     start: 2026-10-12
     # 73, not 80: Thursday's PM recovery run went to basketball. This records
     # the week as it was actually run rather than leaving the allocator to
@@ -234,10 +249,17 @@ weeks:
   # it sits two clear days either side of a hard day.
   # -------------------------------------------------------------------------
   - number: 6
+
+
     start: 2026-10-19
-    volume_km: 80
-    note: "First week of the two-session structure. Run club dropped."
-    long_run: { km: 20 }
+    volume_km: 70
+    note: >-
+      First week of the two-session structure. Run club dropped. Cut from 80
+      to 70 km on 22 Oct, with Wednesday pinned to what was already run and
+      the weekend brought down: 14.5 + 20 km across Sat and Sun was more
+      than a typical whole week, and 20 km was above the 18.5 km maximum of
+      the previous six weeks.
+    long_run: { km: 16 }
     days:
       mon: { kind: gym, focus: "Upper + core" }
       tue:
@@ -250,7 +272,7 @@ weeks:
           recovery: { seconds: 120 }
           pace: five_k
           note: "3min at 5k effort is the classic VO2 rep. Jog the recoveries."
-      wed: { kind: easy, strides: true, gym: "Lower body" }
+      wed: { kind: easy, km: 14.5, strides: true, gym: "Lower body" }
       thu:
         kind: easy
         km: 6.0
@@ -269,15 +291,17 @@ weeks:
           pace: threshold_sharp
           keystone: true
           keystone_note: "KEY SESSION. 30min of threshold work. This is the week."
-      sat: { kind: easy }
+      sat: { kind: easy, km: 8.0 }
       sun: { kind: long_run }
 
   - number: 7
+
+
     start: 2026-10-26
-    volume_km: 80
+    volume_km: 55
     note: "Longest reps of the block. Friday is the keystone."
     keystone: true
-    long_run: { km: 20 }
+    long_run: { km: 16 }
     days:
       mon: { kind: gym, focus: "Upper + core" }
       tue:
@@ -291,12 +315,12 @@ weeks:
           pace: five_k
       wed: { kind: easy, strides: true, gym: "Lower body" }
       thu:
-        kind: easy
-        km: 6.0
+        kind: rest
         note: >-
-          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
-          the key session and this is the day before it, so the volume
-          this day would have carried sits on Wednesday and Saturday.
+          BASKETBALL. Thursday is the rest day from running: basketball is
+          the session, and Friday's key work needs the legs. Whoop has it at
+          55-79 minutes and strain 15-16, which is a real training load, not
+          a gap in the week.
       fri:
         kind: quality
         quality:
@@ -315,10 +339,12 @@ weeks:
       sun: { kind: long_run }
 
   - number: 8
+
+
     start: 2026-11-02
-    volume_km: 78
+    volume_km: 55
     note: "Specificity rises: Tuesday moves to goal-pace reps."
-    long_run: { km: 18 }
+    long_run: { km: 16 }
     days:
       mon: { kind: gym, focus: "Upper + core" }
       tue:
@@ -333,12 +359,12 @@ weeks:
           note: "8km at goal pace. The race rehearsal, broken into four."
       wed: { kind: easy, strides: true, gym: "Lower body" }
       thu:
-        kind: easy
-        km: 6.0
+        kind: rest
         note: >-
-          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
-          the key session and this is the day before it, so the volume
-          this day would have carried sits on Wednesday and Saturday.
+          BASKETBALL. Thursday is the rest day from running: basketball is
+          the session, and Friday's key work needs the legs. Whoop has it at
+          55-79 minutes and strain 15-16, which is a real training load, not
+          a gap in the week.
       fri:
         kind: quality
         quality:
@@ -354,10 +380,12 @@ weeks:
       sun: { kind: long_run }
 
   - number: 9
+
+
     start: 2026-11-09
-    volume_km: 70
+    volume_km: 45
     note: "Taper begins. Intensity stays, volume comes down."
-    long_run: { km: 16 }
+    long_run: { km: 14 }
     days:
       mon: { kind: gym, focus: "Upper + core" }
       tue:
@@ -371,12 +399,12 @@ weeks:
           pace: goal_pace
       wed: { kind: easy, strides: true }
       thu:
-        kind: easy
-        km: 6.0
+        kind: rest
         note: >-
-          BASKETBALL tonight. Capped at 6km, Z1, morning only. Friday is
-          the key session and this is the day before it, so the volume
-          this day would have carried sits on Wednesday and Saturday.
+          BASKETBALL. Thursday is the rest day from running: basketball is
+          the session, and Friday's key work needs the legs. Whoop has it at
+          55-79 minutes and strain 15-16, which is a real training load, not
+          a gap in the week.
       fri:
         kind: quality
         quality:
@@ -391,6 +419,8 @@ weeks:
       sun: { kind: long_run }
 
   - number: 10
+
+
     start: 2026-11-16
     volume_km: 36
     race_week: true

@@ -28,13 +28,28 @@ class TableTests(unittest.TestCase):
     def setUp(self):
         self.table = PaceTable.from_config(PLAN["paces"])
 
-    def test_matches_the_handoff_table(self):
-        self.assertEqual(self.table["goal_pace"].human(), "3:40-3:45")
-        self.assertEqual(self.table["five_k"].human(), "3:35-3:40")
-        self.assertEqual(self.table["threshold"].human(), "4:00-4:08")
+    def test_derived_bands_follow_goal_pace(self):
+        """Offsets, not literals: the goal pace moves when fitness is retested.
+
+        Pinning the derived values broke this suite twice - once at the Tue/Fri
+        restructure and again when the goal went from 37:00 to 38:00. The
+        offsets are the contract; the numbers are whatever goal pace says.
+        """
+        goal = self.table["goal_pace"]
+        spec = PLAN["paces"]
+        for name in ("five_k", "threshold", "threshold_sharp", "vo2", "progression"):
+            entry = spec[name]
+            self.assertEqual(entry.get("from"), "goal_pace", name)
+            band = self.table[name]
+            self.assertEqual(band.fast, goal.fast + float(entry["offset_fast"]), name)
+            if "offset_slow" in entry:
+                self.assertEqual(band.slow, goal.slow + float(entry["offset_slow"]), name)
+
+    def test_absolute_bands_do_not_move_with_goal_pace(self):
+        """Aerobic paces are deliberately not tied to 10k fitness."""
         self.assertEqual(self.table["steady"].human(), "4:25-4:35")
         self.assertEqual(self.table["recovery"].human(), "5:20-5:50")
-        self.assertEqual(self.table["strides"].human(), "3:15")
+        self.assertEqual(self.table["easy"].human(), "5:00-5:30")
 
     def test_goal_pace_is_a_single_variable(self):
         """The whole point: the time trial moves one line and the block follows."""
@@ -48,8 +63,12 @@ class TableTests(unittest.TestCase):
         self.assertEqual(table["easy"].human(), "5:00-5:30")
 
     def test_icu_target_syntax(self):
-        self.assertEqual(self.table["goal_pace"].icu(), "3:40/km-3:45/km Pace")
-        self.assertEqual(self.table["strides"].icu(), "3:15/km Pace")
+        goal = self.table["goal_pace"]
+        self.assertEqual(goal.icu(), f"{goal.human().replace('-', '/km-')}/km Pace")
+        # A zero-width band is a single pace, not a range.
+        strides = self.table["strides"]
+        self.assertEqual(strides.icu(), f"{strides.human()}/km Pace")
+        self.assertNotIn("-", strides.icu())
 
     def test_unresolvable_reference_is_an_error(self):
         with self.assertRaises(ValueError):

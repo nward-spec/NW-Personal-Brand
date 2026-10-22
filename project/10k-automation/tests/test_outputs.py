@@ -54,7 +54,8 @@ class EventTests(unittest.TestCase):
 
     def test_quality_carries_pace_targets(self):
         event = build_events(self.plan.day_plan(QUALITY_DAY))[0]
-        self.assertIn("3:55/km-4:05/km Pace", event.payload["description"])
+        band = self.plan.paces["threshold_sharp"].icu()
+        self.assertIn(band, event.payload["description"])
 
     def test_easy_run_carries_a_heart_rate_ceiling_only(self):
         event = build_events(self.plan.day_plan(dt.date(2026, 9, 17)))[0]

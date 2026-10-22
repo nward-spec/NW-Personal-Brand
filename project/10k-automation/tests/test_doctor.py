@@ -9,11 +9,13 @@ from pathlib import Path
 from unittest import mock
 
 from tenk.config import Config
+from tenk.plan import Plan
 from tenk.doctor import FAIL, OK, SKIP, WARN, Doctor, render
 from tenk.state import TokenStore
 from tenk.tiers import RecoveryRecord
 
 ROOT = Path(__file__).resolve().parent.parent
+PLAN_GOAL = Plan.load(ROOT / 'config' / 'plan.yaml').goal_pace.human()
 TODAY = dt.date(2026, 9, 19)
 
 
@@ -185,7 +187,7 @@ class OfflineTests(unittest.TestCase):
             checks = self.run_doctor()
         plan = find(checks, "plan")
         self.assertEqual(plan.status, OK)
-        self.assertIn("3:40-3:45", plan.detail)
+        self.assertIn(PLAN_GOAL, plan.detail)
 
     def test_placeholder_athlete_id_is_a_blocking_failure(self):
         cfg = config(self.state, intervals_icu={"enabled": True, "athlete_id": "i00000"})
