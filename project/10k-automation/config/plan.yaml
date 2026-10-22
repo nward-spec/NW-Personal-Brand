@@ -95,7 +95,10 @@ rules:
   # Friday is a gym day in weeks 1-5 and the key-session day from week 6.
   # Listing it here is safe either way: the allocator reads each day's kind
   # from the template, so a Friday whose kind is `gym` is simply skipped.
-  run_days: [tue, wed, thu, fri, sat, sun]
+  # Monday is a gym day in weeks 1-6 and an easy run plus gym from week 7.
+  # A weekday listed here is only allocated volume when its kind is easy or
+  # structural, so a Monday whose kind is `gym` is still skipped.
+  run_days: [mon, tue, wed, thu, fri, sat, sun]
   double_min_km: 5.0          # no run shorter than this, ever
   double_threshold_km: 12.0   # single run until the day needs more than this
   double_days: [tue, thu, sat] # never Wednesday (run club), never Sunday (long run)
@@ -138,6 +141,7 @@ weeks:
   - number: 1
 
 
+
     start: 2026-09-14
     volume_km: 58
     quality:
@@ -150,6 +154,7 @@ weeks:
     long_run: { km: 14 }
 
   - number: 2
+
 
 
     start: 2026-09-21
@@ -166,6 +171,7 @@ weeks:
   - number: 3
 
 
+
     start: 2026-09-28
     volume_km: 72
     quality:
@@ -180,6 +186,7 @@ weeks:
   - number: 4
 
 
+
     start: 2026-10-05
     volume_km: 62
     note: "Down week. AEDT starts 4 Oct. parkrun time trial recalibrates goal pace."
@@ -191,6 +198,7 @@ weeks:
     long_run: { km: 16 }
 
   - number: 5
+
 
 
     start: 2026-10-12
@@ -251,6 +259,7 @@ weeks:
   - number: 6
 
 
+
     start: 2026-10-19
     volume_km: 70
     note: >-
@@ -297,13 +306,14 @@ weeks:
   - number: 7
 
 
+
     start: 2026-10-26
     volume_km: 55
     note: "Longest reps of the block. Friday is the keystone."
     keystone: true
     long_run: { km: 16 }
     days:
-      mon: { kind: gym, focus: "Upper + core" }
+      mon: { kind: easy, gym: "Lower body" }
       tue:
         kind: quality
         quality:
@@ -313,9 +323,10 @@ weeks:
           rep: { minutes: 4 }
           recovery: { seconds: 150 }
           pace: five_k
-      wed: { kind: easy, strides: true, gym: "Lower body" }
+      wed: { kind: easy, strides: true }
       thu:
         kind: rest
+        gym: "Upper + core"
         note: >-
           BASKETBALL. Thursday is the rest day from running: basketball is
           the session, and Friday's key work needs the legs. Whoop has it at
@@ -335,10 +346,13 @@ weeks:
             KEYSTONE. 30min of threshold in two blocks. Hold the band through
             the second rep and the race is there. Fading badly in rep 2 is the
             honest signal to revise the goal, not to try harder next week.
-      sat: { kind: easy }
+      sat:
+        kind: rest
+        note: "Rest. The week's volume sits on Mon, Tue, Wed, Fri and Sun."
       sun: { kind: long_run }
 
   - number: 8
+
 
 
     start: 2026-11-02
@@ -346,7 +360,7 @@ weeks:
     note: "Specificity rises: Tuesday moves to goal-pace reps."
     long_run: { km: 16 }
     days:
-      mon: { kind: gym, focus: "Upper + core" }
+      mon: { kind: easy, gym: "Lower body" }
       tue:
         kind: quality
         quality:
@@ -357,9 +371,10 @@ weeks:
           recovery: { seconds: 120 }
           pace: goal_pace
           note: "8km at goal pace. The race rehearsal, broken into four."
-      wed: { kind: easy, strides: true, gym: "Lower body" }
+      wed: { kind: easy, strides: true }
       thu:
         kind: rest
+        gym: "Upper + core"
         note: >-
           BASKETBALL. Thursday is the rest day from running: basketball is
           the session, and Friday's key work needs the legs. Whoop has it at
@@ -376,10 +391,13 @@ weeks:
           pace: threshold_sharp
           keystone: true
           keystone_note: "KEY SESSION. 32min of threshold off short recoveries."
-      sat: { kind: easy }
+      sat:
+        kind: rest
+        note: "Rest. The week's volume sits on Mon, Tue, Wed, Fri and Sun."
       sun: { kind: long_run }
 
   - number: 9
+
 
 
     start: 2026-11-09
@@ -387,7 +405,7 @@ weeks:
     note: "Taper begins. Intensity stays, volume comes down."
     long_run: { km: 14 }
     days:
-      mon: { kind: gym, focus: "Upper + core" }
+      mon: { kind: easy, gym: "Lower body" }
       tue:
         kind: quality
         quality:
@@ -400,6 +418,7 @@ weeks:
       wed: { kind: easy, strides: true }
       thu:
         kind: rest
+        gym: "Upper + core"
         note: >-
           BASKETBALL. Thursday is the rest day from running: basketball is
           the session, and Friday's key work needs the legs. Whoop has it at
@@ -415,10 +434,13 @@ weeks:
           recovery: { seconds: 120 }
           pace: threshold_sharp
           note: "Last threshold session. Cut back, not cut out. Do not add reps."
-      sat: { kind: easy }
+      sat:
+        kind: rest
+        note: "Rest. The week's volume sits on Mon, Tue, Wed, Fri and Sun."
       sun: { kind: long_run }
 
   - number: 10
+
 
 
     start: 2026-11-16

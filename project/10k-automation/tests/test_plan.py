@@ -21,20 +21,28 @@ class PlanShapeTests(unittest.TestCase):
             self.assertEqual(week.start.weekday(), 0, week.number)
 
     def test_run_days_match_the_phase_of_the_block(self):
-        """Weeks 1-5 run Tue/Wed/Thu/Sat/Sun; weeks 6-9 add Friday.
+        """The run days move twice in the block.
 
-        Friday is a gym day up to week 5 and the key session from week 6, so
-        "the run days never change" stopped being true at week 6.
+        Weeks 1-5 run Tue/Wed/Thu/Sat/Sun. Week 6 adds Friday as the second
+        key session. Weeks 7-9 move the easy volume off Thursday and Saturday
+        (basketball, and a rest day before the long run) and onto Monday, so
+        Monday stops being gym-only.
         """
+        moved = range(7, 10)
         for week in self.plan.weeks:
             for offset in range(7):
                 day = week.start + dt.timedelta(days=offset)
                 plan_day = self.plan.day_plan(day)
                 weekday = plan_day.weekday
-                if weekday == "mon":
-                    self.assertFalse(plan_day.runs, f"{day} should be a gym day")
-                if weekday in ("tue", "wed", "sat", "sun"):
+                if weekday in ("tue", "wed", "sun"):
                     self.assertTrue(plan_day.runs, f"{day} must be a run day")
+                if weekday == "mon":
+                    # Monday carries the easy run the restructure took off
+                    # Thursday, alongside its gym slot.
+                    if week.number in moved:
+                        self.assertTrue(plan_day.runs, f"{day} must be a run day")
+                    else:
+                        self.assertFalse(plan_day.runs, f"{day} should be a gym day")
                 if weekday == "fri":
                     if 6 <= week.number <= 9:
                         self.assertTrue(plan_day.runs, f"{day} is the key session")
@@ -45,8 +53,15 @@ class PlanShapeTests(unittest.TestCase):
                     # rest day from running, so Friday's key session is not
                     # run on legs that played the night before and also ran
                     # that morning.
-                    if 7 <= week.number <= 9:
+                    if week.number in moved:
                         self.assertFalse(plan_day.runs, f"{day} is basketball")
+                    else:
+                        self.assertTrue(plan_day.runs, f"{day} must be a run day")
+                if weekday == "sat":
+                    # Saturday is the full rest day once Friday is a key
+                    # session and Sunday is the long run.
+                    if week.number in moved:
+                        self.assertFalse(plan_day.runs, f"{day} is a rest day")
                     else:
                         self.assertTrue(plan_day.runs, f"{day} must be a run day")
 
@@ -83,29 +98,32 @@ class AllocationTests(unittest.TestCase):
     def test_every_run_day_is_present_in_every_week(self):
         for number in range(1, 10):
             allocation = self.plan.allocate(self.week(number))
-            expected = {"tue", "wed", "sat", "sun"}
+            expected = {"tue", "wed", "sun"}
             if 6 <= number <= 9:
                 expected.add("fri")        # the key session day
-            if not 7 <= number <= 9:
-                expected.add("thu")        # rest for basketball from week 7
+            if 7 <= number <= 9:
+                expected.add("mon")        # easy volume moved onto Monday
+            else:
+                expected.update({"thu", "sat"})   # rest from week 7
             self.assertEqual(set(allocation.day_km), expected, f"week {number}")
             for day, km in allocation.day_km.items():
                 self.assertGreaterEqual(km, 5.0, f"week {number} {day}")
 
     def test_a_short_midweek_run_moves_volume_to_the_other_easy_day(self):
-        """Thursday is a rest day from week 7, so Saturday is what flexes."""
+        """Thursday and Saturday are rest from week 7, so Monday is what flexes."""
         week = self.week(7)
         planned = self.plan.allocate(week)
         short = self.plan.allocate(week, {"wed": 4.0})
-        self.assertGreater(short.day_km["sat"], planned.day_km["sat"])
+        self.assertGreater(short.day_km["mon"], planned.day_km["mon"])
         self.assertEqual(short.day_km["wed"], 4.0)
         self.assertNotIn("thu", planned.day_km)
+        self.assertNotIn("sat", planned.day_km)
 
     def test_a_long_midweek_run_takes_volume_off_the_other_easy_day(self):
         week = self.week(7)
         planned = self.plan.allocate(week)
-        long_wed = self.plan.allocate(week, {"wed": 18.0})
-        self.assertLess(long_wed.day_km["sat"], planned.day_km["sat"])
+        long_wed = self.plan.allocate(week, {"wed": 12.0})
+        self.assertLess(long_wed.day_km["mon"], planned.day_km["mon"])
 
     def test_a_pinned_easy_day_never_absorbs_volume(self):
         """A week-6 Thursday is capped at 6km, whatever Wednesday came back as."""

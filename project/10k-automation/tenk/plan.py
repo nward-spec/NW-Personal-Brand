@@ -328,7 +328,9 @@ class Plan:
         # only way to fit two quality sessions and two gym sessions into
         # seven days.
         if spec.get("gym"):
-            plan_day.gym = self._gym_workout(str(spec["gym"]), running=True)
+            # A rest day can still carry a gym slot - Thursday is no running
+            # because of basketball, not because nothing happens.
+            plan_day.gym = self._gym_workout(str(spec["gym"]), running=(kind != "rest"))
         if kind == "rest":
             plan_day.rest = True
             return plan_day

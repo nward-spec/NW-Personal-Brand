@@ -44,9 +44,21 @@ class EventTests(unittest.TestCase):
         events = build_events(self.plan.day_plan(DOUBLE_DAY))
         self.assertEqual([e.external_id for e in events], ["10k-w05-tue-am", "10k-w05-tue-pm"])
 
-    def test_gym_day_writes_a_gym_event(self):
+    def test_gym_only_day_writes_a_gym_event(self):
+        events = build_events(self.plan.day_plan(dt.date(2026, 10, 19)))
+        self.assertEqual([e.payload["type"] for e in events], ["WeightTraining"])
+
+    def test_a_run_plus_gym_day_writes_both(self):
+        """Monday from week 7 is an easy run and a gym session."""
         events = build_events(self.plan.day_plan(dt.date(2026, 10, 26)))
-        self.assertEqual(events[0].payload["type"], "WeightTraining")
+        self.assertEqual([e.payload["type"] for e in events], ["Run", "WeightTraining"])
+        self.assertEqual([e.external_id for e in events],
+                         ["10k-w07-mon-am", "10k-w07-mon-gym"])
+
+    def test_a_basketball_thursday_still_writes_its_gym_event(self):
+        """Thursday is rest from running, not rest from everything."""
+        events = build_events(self.plan.day_plan(dt.date(2026, 10, 29)))
+        self.assertEqual([e.payload["type"] for e in events], ["WeightTraining"])
 
     def test_distance_is_written_in_metres(self):
         event = build_events(self.plan.day_plan(QUALITY_DAY))[0]
