@@ -18,6 +18,11 @@ meta:
     name: "2XU Wellness Run 10k"
     location: "St Kilda foreshore"
     date: 2026-11-22
+    # 10km gun time, confirmed from wellnessrun.com.au/melbourne-10k-run on
+    # 22 Oct 2026. Nick is in the RED wave (under 45 mins, under 4:30/km),
+    # which is the first off. Green 8:42, Yellow 8:45, Blue 8:48.
+    start_local: "08:40"
+    wave: "Red"
     distance_km: 10
     goal: "38:00"
   pb_10k: "38:19"

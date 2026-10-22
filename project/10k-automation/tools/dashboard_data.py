@@ -85,6 +85,8 @@ def build() -> dict:
         "meta": {
             "race": plan.meta["race"]["name"],
             "where": plan.meta["race"]["location"],
+            "start_local": plan.meta["race"].get("start_local"),
+            "wave": plan.meta["race"].get("wave"),
             "race_date": plan.race_date.isoformat(),
             "goal": plan.meta["race"]["goal"],
             "goal_pace": plan.goal_pace.human(),
