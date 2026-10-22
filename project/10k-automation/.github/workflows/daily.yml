@@ -1,0 +1,102 @@
+# The morning engine, running on GitHub's clock instead of a laptop's.
+#
+# This exists because the launchd job only fired when the MacBook happened to
+# be awake, which it usually is not at 5am. A missed morning is not a cosmetic
+# failure: the day goes out unadjusted and the watch gets the wrong session.
+#
+# Times are UTC. The block runs to 22 Nov 2026, which is entirely inside AEDT
+# (UTC+11), so 18:00-23:00 UTC is 05:00-10:00 Melbourne. If this is ever reused
+# outside daylight saving, shift the hours by one.
+name: Morning engine
+
+on:
+  schedule:
+    - cron: "*/30 18-23 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Classify and log, but write nothing to intervals.icu"
+        type: boolean
+        default: false
+
+# Whoop issues single-use refresh tokens. Two runs overlapping would spend the
+# same token twice and lock the engine out of the API until it is re-authorised
+# by hand, so runs are strictly serialised and a queued run is never cancelled.
+concurrency:
+  group: morning-engine
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Unseal state
+        env:
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          WHOOP_TOKEN_SEED: ${{ secrets.WHOOP_TOKEN_SEED }}
+        run: ops/ci_state.sh unseal
+
+      - name: Write config
+        env:
+          INTERVALS_ICU_ATHLETE_ID: ${{ secrets.INTERVALS_ICU_ATHLETE_ID }}
+        run: ops/ci_config.sh
+
+      - name: Run the engine
+        id: engine
+        env:
+          WHOOP_CLIENT_ID: ${{ secrets.WHOOP_CLIENT_ID }}
+          WHOOP_CLIENT_SECRET: ${{ secrets.WHOOP_CLIENT_SECRET }}
+          INTERVALS_ICU_API_KEY: ${{ secrets.INTERVALS_ICU_API_KEY }}
+        run: |
+          python -m tenk.cli run ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      # Always, including after a failed run. The refresh token is rotated and
+      # written to disk BEFORE the access token is used, so a run that dies
+      # halfway still leaves the only valid token sitting in the workspace.
+      # Dropping it there is how you lose Whoop access for good.
+      - name: Seal and commit state
+        if: always()
+        env:
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+        run: ops/ci_state.sh seal
+
+      - name: Push state
+        if: always()
+        run: |
+          git config user.name  "morning-engine"
+          git config user.email "noreply@github.com"
+          # state/ stays gitignored so a run on a laptop can never commit
+          # recovery data by accident. CI force-adds exactly the files it
+          # means to publish, and nothing else in that directory.
+          for f in state/whoop_tokens.json.enc \
+                   state/run_state.json \
+                   state/decisions.jsonl \
+                   state/dashboard-status.json; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          if git diff --cached --quiet; then
+            echo "state unchanged"
+            exit 0
+          fi
+          git commit -m "state: $(date -u +%Y-%m-%dT%H:%MZ)"
+          # A queued run may have pushed while this one was working.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1
